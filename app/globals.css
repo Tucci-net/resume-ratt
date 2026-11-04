@@ -1,0 +1,378 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-white text-black transition-colors duration-300 dark:bg-neutral-950 dark:text-white;
+}
+
+.resume-content-section {
+  margin-top: var(--resume-section-spacing, 18px);
+}
+
+.resume-page-viewport {
+  position: relative;
+  width: 100%;
+}
+
+.resume-page-frame {
+  position: relative;
+}
+
+.resume-page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  transform-origin: top left;
+}
+
+.resume-paper-page {
+  position: relative;
+  box-sizing: border-box;
+  flex: none;
+  width: 8.5in;
+  min-height: 11in;
+  padding: 0.6in;
+}
+
+.resume-page-block {
+  display: flow-root;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.resume-page-number {
+  position: absolute;
+  right: 0.6in;
+  bottom: 0.3in;
+  color: #737373;
+  font-size: 9pt;
+}
+
+.resume-page-measurement {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  display: block;
+  box-sizing: border-box;
+  width: 8.5in;
+  padding: 0.6in;
+  overflow: visible;
+  visibility: hidden;
+  pointer-events: none;
+  background: white;
+}
+
+.resume-editor-surface {
+  overflow: hidden;
+  border: 1px solid rgb(115 115 115 / 20%);
+  border-radius: 0.75rem;
+  background-color: white;
+}
+
+.dark .resume-editor-surface {
+  border-color: rgb(115 115 115 / 25%);
+  background-color: rgb(23 23 23);
+}
+
+.resume-editor-section + .resume-editor-section {
+  border-top: 1px solid rgb(115 115 115 / 16%);
+}
+
+.dark .resume-editor-section + .resume-editor-section {
+  border-top-color: rgb(115 115 115 / 22%);
+}
+
+.resume-disclosure-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  width: 100%;
+  border: 1px solid rgb(115 115 115 / 20%);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.resume-disclosure-trigger:hover {
+  border-color: rgb(115 115 115 / 40%);
+  background-color: rgb(115 115 115 / 4%);
+}
+
+.resume-disclosure-trigger:focus-visible {
+  outline: 2px solid rgb(59 130 246 / 70%);
+  outline-offset: 2px;
+}
+
+.resume-disclosure-chevron {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  color: rgb(115 115 115 / 80%);
+  transition: transform 220ms ease;
+}
+
+.resume-disclosure-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.resume-accordion-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 220ms ease,
+    opacity 180ms ease;
+}
+
+.resume-accordion-panel.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.resume-accordion-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.resume-confirm-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid rgb(115 115 115 / 24%);
+  border-radius: 0.875rem;
+  background: white;
+  color: #171717;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 24%);
+  opacity: 0;
+  transform: translateY(0.5rem) scale(0.98);
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease,
+    overlay 200ms allow-discrete,
+    display 200ms allow-discrete;
+}
+
+.resume-confirm-dialog[open] {
+  display: block;
+}
+
+.resume-confirm-dialog[data-phase="open"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.resume-confirm-dialog[data-phase="closing"] {
+  opacity: 0;
+  transform: translateY(0.35rem) scale(0.985);
+}
+
+.dark .resume-confirm-dialog {
+  border-color: rgb(115 115 115 / 30%);
+  background: #171717;
+  color: white;
+}
+
+.resume-confirm-dialog::backdrop {
+  background: rgb(10 10 10 / 48%);
+  opacity: 0;
+  transition:
+    opacity 200ms ease,
+    overlay 200ms allow-discrete,
+    display 200ms allow-discrete;
+}
+
+.resume-confirm-dialog[data-phase="open"]::backdrop {
+  opacity: 1;
+}
+
+.resume-confirm-dialog[data-phase="closing"]::backdrop {
+  opacity: 0;
+}
+
+.resume-confirm-dialog-panel {
+  padding: 1.25rem;
+}
+
+.resume-confirm-dialog button {
+  min-height: 2.5rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.resume-confirm-dialog button:focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: 2px;
+}
+
+.resume-confirm-dialog button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.resume-confirm-dialog-secondary {
+  border: 1px solid rgb(115 115 115 / 30%);
+  background: transparent;
+  color: inherit;
+}
+
+.resume-confirm-dialog-secondary:hover:not(:disabled) {
+  background: rgb(115 115 115 / 8%);
+}
+
+.resume-confirm-dialog-primary {
+  border: 1px solid #6d28d9;
+  background: #6d28d9;
+  color: white;
+}
+
+.resume-confirm-dialog-primary:hover:not(:disabled) {
+  border-color: #5b21b6;
+  background: #5b21b6;
+}
+
+.resume-confirm-dialog-destructive {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: white;
+}
+
+.resume-confirm-dialog-destructive:hover:not(:disabled) {
+  border-color: #b91c1c;
+  background: #b91c1c;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume-disclosure-trigger,
+  .resume-disclosure-chevron,
+  .resume-accordion-panel,
+  .resume-confirm-dialog,
+  .resume-confirm-dialog::backdrop,
+  .resume-confirm-dialog button {
+    transition: none;
+  }
+}
+
+@media print {
+  @page {
+    size: letter;
+    margin: 0.6in;
+  }
+
+  html,
+  body,
+  .dashboard-layout {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .resume-print-area,
+  .resume-print-area * {
+    visibility: visible !important;
+  }
+
+  .resume-editor-panel,
+  .resume-builder-header,
+  .resume-builder-footer,
+  .resume-ats-preview {
+    display: none !important;
+  }
+
+  .dashboard-sidebar {
+    display: none !important;
+  }
+
+  .resume-builder-main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .resume-builder-layout {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .resume-page-status,
+  .resume-page-number,
+  .resume-page-measurement {
+    display: none !important;
+  }
+
+  .resume-page-viewport,
+  .resume-page-frame {
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .resume-page-stack {
+    display: block !important;
+    width: auto !important;
+    transform: none !important;
+  }
+
+  .resume-paper-page {
+    width: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .resume-paper-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .resume-print-area {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .resume-entry,
+  .resume-section-heading,
+  .resume-entry-heading {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .resume-section-heading,
+  .resume-entry-heading {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}

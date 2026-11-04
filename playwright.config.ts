@@ -1,0 +1,15 @@
+import { defineConfig } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./e2e",
+  reporter: "list",
+  use: {
+    baseURL: "http://127.0.0.1:3219",
+  },
+  webServer: {
+    command: "pnpm dev --hostname 127.0.0.1 --port 3219",
+    url: "http://127.0.0.1:3219",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
+});
