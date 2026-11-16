@@ -1,0 +1,15 @@
+schemaVersion: 1
+catalogVersion: 1.0.0
+providers:
+  - id: manual-user-supplied-source
+    displayName: User-supplied source (manual)
+    providerType: manual
+    countries: []
+    roleFamilyIds: []
+    industries: []
+    capabilities: []
+    authRequirements:
+      - No Career RAT authentication; users visit sources themselves.
+    automationPolicy: manual-only
+    enabled: true
+    status: available

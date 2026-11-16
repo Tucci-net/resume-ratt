@@ -41,7 +41,7 @@ export default function HomePage() {
   less painful.
 </p>
           <Link
-            href="/dashboard"
+            href="/resume"
             className="mt-8 rounded-md bg-black px-5 py-3 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
           >
             Build your resume

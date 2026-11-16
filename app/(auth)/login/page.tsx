@@ -14,7 +14,7 @@ export default function LoginPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("github", { redirectTo: "/dashboard" });
+            await signIn("github", { redirectTo: "/resume" });
           }}
         >
           <button
@@ -25,7 +25,7 @@ export default function LoginPage() {
           </button>
         </form>
         <Link
-  href="/dashboard"
+  href="/resume"
   className="rounded-md border border-neutral-300 px-5 py-2.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
 >
   Continue to resume builder

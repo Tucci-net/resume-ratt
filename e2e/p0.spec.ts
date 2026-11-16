@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("autosaves resume content across a browser reload", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await waitForDrafts(page);
   await page.getByLabel("Full name").fill("Morgan Resume Test");
   await expect(page.locator(".resume-paper-page")).toContainText(
@@ -19,7 +19,7 @@ test("autosaves resume content across a browser reload", async ({ page }) => {
 test("reuses Career Library wording without changing canonical text", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await waitForDrafts(page);
   await page.getByRole("button", { name: /Career Library/ }).click();
   await page.getByLabel("Canonical text", { exact: true }).fill(
@@ -67,7 +67,7 @@ test("reuses Career Library wording without changing canonical text", async ({
 test("imports library data without overwriting a matching stable ID", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await waitForDrafts(page);
   await page.getByRole("button", { name: /Career Library/ }).click();
   await page.getByLabel("Canonical text", { exact: true }).fill("Original canonical skill");
@@ -111,7 +111,7 @@ test("imports library data without overwriting a matching stable ID", async ({
 });
 
 test("persists section visibility and ordering", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await waitForDrafts(page);
   await page.getByRole("button", { name: /Page structure/ }).click();
   await page.getByRole("button", { name: "Hide Skills" }).click();
@@ -148,7 +148,7 @@ test("persists section visibility and ordering", async ({ page }) => {
 test("detects content overflow and honors print-only visibility", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await waitForDrafts(page);
   await page.getByRole("textbox", { name: "Summary" }).fill(
     "Experienced professional delivering measurable outcomes. ".repeat(600),

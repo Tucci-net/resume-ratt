@@ -1,0 +1,30 @@
+schemaVersion: 1
+taxonomyVersion: 1.0.0
+locale: en-US
+industries:
+  - id: software-saas
+    label: Software and SaaS
+    relatedIndustryIds:
+      - enterprise-software
+      - cloud-services
+  - id: enterprise-software
+    label: Enterprise Software
+    relatedIndustryIds:
+      - software-saas
+      - cloud-services
+      - financial-services
+  - id: cloud-services
+    label: Cloud Services
+    relatedIndustryIds:
+      - software-saas
+      - enterprise-software
+  - id: government-technology
+    label: Government Technology
+    relatedIndustryIds: []
+  - id: healthcare-technology
+    label: Healthcare Technology
+    relatedIndustryIds: []
+  - id: financial-services
+    label: Financial Services
+    relatedIndustryIds:
+      - enterprise-software

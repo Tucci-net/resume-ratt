@@ -1,0 +1,167 @@
+schemaVersion: 1
+taxonomyVersion: 1.0.0
+locale: en-US
+families:
+  - id: software-engineering
+    label: Software Engineering
+    description: Designing, building, testing, and maintaining software systems.
+    relatedFamilies:
+      - familyId: full-stack-engineering
+        relationship: specializes-in
+        strength: 0.9
+      - familyId: product-engineering
+        relationship: overlaps
+        strength: 0.76
+      - familyId: systems-integration
+        relationship: adjacent
+        strength: 0.65
+      - familyId: application-systems
+        relationship: adjacent
+        strength: 0.62
+      - familyId: infrastructure-software
+        relationship: adjacent
+        strength: 0.55
+  - id: full-stack-engineering
+    label: Full-Stack Engineering
+    description: Building product functionality across user interfaces and application services.
+    relatedFamilies:
+      - familyId: software-engineering
+        relationship: specializes-in
+        strength: 0.9
+      - familyId: product-engineering
+        relationship: overlaps
+        strength: 0.82
+      - familyId: systems-integration
+        relationship: adjacent
+        strength: 0.67
+      - familyId: application-systems
+        relationship: overlaps
+        strength: 0.7
+      - familyId: platform-engineering
+        relationship: adjacent
+        strength: 0.48
+  - id: product-engineering
+    label: Product Engineering
+    description: Delivering software product outcomes through close collaboration across product, design, and engineering.
+    relatedFamilies:
+      - familyId: full-stack-engineering
+        relationship: overlaps
+        strength: 0.82
+      - familyId: software-engineering
+        relationship: adjacent
+        strength: 0.76
+      - familyId: implementation-engineering
+        relationship: adjacent
+        strength: 0.58
+      - familyId: forward-deployed-engineering
+        relationship: adjacent
+        strength: 0.62
+  - id: systems-integration
+    label: Systems Integration
+    description: Connecting applications, services, data, and infrastructure into cohesive operating systems.
+    relatedFamilies:
+      - familyId: application-systems
+        relationship: overlaps
+        strength: 0.82
+      - familyId: infrastructure-software
+        relationship: adjacent
+        strength: 0.72
+      - familyId: implementation-engineering
+        relationship: overlaps
+        strength: 0.73
+      - familyId: forward-deployed-engineering
+        relationship: adjacent
+        strength: 0.61
+      - familyId: software-engineering
+        relationship: adjacent
+        strength: 0.65
+  - id: infrastructure-software
+    label: Infrastructure Software
+    description: Building and operating software that provisions, connects, or runs technical infrastructure.
+    relatedFamilies:
+      - familyId: platform-engineering
+        relationship: overlaps
+        strength: 0.86
+      - familyId: devops
+        relationship: overlaps
+        strength: 0.82
+      - familyId: systems-integration
+        relationship: adjacent
+        strength: 0.72
+      - familyId: software-engineering
+        relationship: adjacent
+        strength: 0.55
+  - id: platform-engineering
+    label: Platform Engineering
+    description: Creating internal platforms and paved paths that help teams build and operate software.
+    relatedFamilies:
+      - familyId: infrastructure-software
+        relationship: overlaps
+        strength: 0.86
+      - familyId: devops
+        relationship: overlaps
+        strength: 0.79
+      - familyId: software-engineering
+        relationship: adjacent
+        strength: 0.55
+      - familyId: full-stack-engineering
+        relationship: adjacent
+        strength: 0.48
+  - id: devops
+    label: DevOps
+    description: Improving the delivery and operation of software through automation, reliability, and shared ownership.
+    relatedFamilies:
+      - familyId: infrastructure-software
+        relationship: overlaps
+        strength: 0.82
+      - familyId: platform-engineering
+        relationship: overlaps
+        strength: 0.79
+      - familyId: systems-integration
+        relationship: adjacent
+        strength: 0.57
+  - id: application-systems
+    label: Application Systems
+    description: Implementing and connecting business applications, workflows, and supporting services.
+    relatedFamilies:
+      - familyId: systems-integration
+        relationship: overlaps
+        strength: 0.82
+      - familyId: implementation-engineering
+        relationship: overlaps
+        strength: 0.78
+      - familyId: software-engineering
+        relationship: adjacent
+        strength: 0.62
+      - familyId: full-stack-engineering
+        relationship: overlaps
+        strength: 0.7
+  - id: implementation-engineering
+    label: Implementation Engineering
+    description: Translating customer and operational requirements into configured, integrated, working systems.
+    relatedFamilies:
+      - familyId: application-systems
+        relationship: overlaps
+        strength: 0.78
+      - familyId: systems-integration
+        relationship: overlaps
+        strength: 0.73
+      - familyId: forward-deployed-engineering
+        relationship: overlaps
+        strength: 0.8
+      - familyId: product-engineering
+        relationship: adjacent
+        strength: 0.58
+  - id: forward-deployed-engineering
+    label: Forward-Deployed Engineering
+    description: Applying software engineering directly to customer environments and high-context deployment problems.
+    relatedFamilies:
+      - familyId: implementation-engineering
+        relationship: overlaps
+        strength: 0.8
+      - familyId: product-engineering
+        relationship: adjacent
+        strength: 0.62
+      - familyId: systems-integration
+        relationship: adjacent
+        strength: 0.61

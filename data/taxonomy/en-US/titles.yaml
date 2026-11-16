@@ -1,0 +1,158 @@
+schemaVersion: 1
+taxonomyVersion: 1.0.0
+locale: en-US
+titles:
+  - id: software-engineer
+    label: Software Engineer
+    roleFamilyIds:
+      - software-engineering
+    responsibilityIds:
+      - end-to-end-software-delivery
+      - production-troubleshooting
+    skillIds:
+      - typescript
+      - python
+      - api-integration
+  - id: full-stack-engineer
+    label: Full-Stack Engineer
+    roleFamilyIds:
+      - full-stack-engineering
+      - software-engineering
+    responsibilityIds:
+      - end-to-end-software-delivery
+      - product-feature-delivery
+    skillIds:
+      - typescript
+      - react
+      - nodejs
+  - id: full-stack-systems-engineer
+    label: Full-Stack Systems Engineer
+    roleFamilyIds:
+      - full-stack-engineering
+      - systems-integration
+      - application-systems
+    responsibilityIds:
+      - end-to-end-software-delivery
+      - systems-integration
+      - production-troubleshooting
+    skillIds:
+      - typescript
+      - react
+      - nodejs
+      - systems-integration-skill
+  - id: product-engineer
+    label: Product Engineer
+    roleFamilyIds:
+      - product-engineering
+      - full-stack-engineering
+    responsibilityIds:
+      - product-feature-delivery
+      - end-to-end-software-delivery
+    skillIds:
+      - typescript
+      - react
+      - product-delivery
+  - id: systems-integration-engineer
+    label: Systems Integration Engineer
+    roleFamilyIds:
+      - systems-integration
+      - application-systems
+      - implementation-engineering
+    responsibilityIds:
+      - systems-integration
+      - application-systems-implementation
+      - production-troubleshooting
+    skillIds:
+      - systems-integration-skill
+      - api-integration
+      - networking
+  - id: infrastructure-software-engineer
+    label: Infrastructure Software Engineer
+    roleFamilyIds:
+      - infrastructure-software
+      - platform-engineering
+    responsibilityIds:
+      - deployment-automation
+      - platform-enablement
+      - production-troubleshooting
+    skillIds:
+      - cloud-infrastructure
+      - ci-cd
+      - containers
+  - id: platform-engineer
+    label: Platform Engineer
+    roleFamilyIds:
+      - platform-engineering
+      - infrastructure-software
+      - devops
+    responsibilityIds:
+      - platform-enablement
+      - deployment-automation
+    skillIds:
+      - cloud-infrastructure
+      - containers
+      - ci-cd
+  - id: devops-engineer
+    label: DevOps Engineer
+    roleFamilyIds:
+      - devops
+      - infrastructure-software
+      - platform-engineering
+    responsibilityIds:
+      - deployment-automation
+      - production-troubleshooting
+    skillIds:
+      - ci-cd
+      - cloud-infrastructure
+      - observability
+  - id: application-systems-engineer
+    label: Application Systems Engineer
+    roleFamilyIds:
+      - application-systems
+      - systems-integration
+      - implementation-engineering
+    responsibilityIds:
+      - application-systems-implementation
+      - systems-integration
+    skillIds:
+      - api-integration
+      - systems-integration-skill
+      - requirements-discovery
+  - id: implementation-engineer
+    label: Implementation Engineer
+    roleFamilyIds:
+      - implementation-engineering
+      - application-systems
+    responsibilityIds:
+      - application-systems-implementation
+      - customer-technical-discovery
+    skillIds:
+      - customer-implementation
+      - requirements-discovery
+      - api-integration
+  - id: forward-deployed-engineer
+    label: Forward Deployed Engineer
+    roleFamilyIds:
+      - forward-deployed-engineering
+      - implementation-engineering
+      - product-engineering
+    responsibilityIds:
+      - forward-deployed-delivery
+      - customer-technical-discovery
+    skillIds:
+      - customer-implementation
+      - requirements-discovery
+      - python
+  - id: site-reliability-engineer
+    label: Site Reliability Engineer
+    roleFamilyIds:
+      - infrastructure-software
+      - platform-engineering
+      - devops
+    responsibilityIds:
+      - production-troubleshooting
+      - platform-enablement
+    skillIds:
+      - observability
+      - cloud-infrastructure
+      - ci-cd

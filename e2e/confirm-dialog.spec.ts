@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("cancels draft deletion by button, Escape, and backdrop", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await expect(page.getByText("Saved in this browser")).toBeVisible({
     timeout: 10_000,
   });
@@ -46,7 +46,7 @@ test("cancels draft deletion by button, Escape, and backdrop", async ({
 });
 
 test("deletes a draft only after explicit confirmation", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await expect(page.getByText("Saved in this browser")).toBeVisible({
     timeout: 10_000,
   });
@@ -81,7 +81,7 @@ test("deletes a draft only after explicit confirmation", async ({ page }) => {
 
 test("closes immediately when reduced motion is requested", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/dashboard");
+  await page.goto("/resume");
   await expect(page.getByText("Saved in this browser")).toBeVisible({
     timeout: 10_000,
   });

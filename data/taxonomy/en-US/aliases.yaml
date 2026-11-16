@@ -1,0 +1,46 @@
+schemaVersion: 1
+taxonomyVersion: 1.0.0
+locale: en-US
+aliases:
+  - value: Integration Engineer
+    entityType: role-title
+    entityId: systems-integration-engineer
+  - value: System Integration Engineer
+    entityType: role-title
+    entityId: systems-integration-engineer
+  - value: Full Stack Engineer
+    entityType: role-title
+    entityId: full-stack-engineer
+  - value: Full-Stack Systems Engineer
+    entityType: role-title
+    entityId: full-stack-systems-engineer
+  - value: Application Systems Specialist
+    entityType: role-title
+    entityId: application-systems-engineer
+  - value: Infrastructure Engineer
+    entityType: role-title
+    entityId: infrastructure-software-engineer
+  - value: Platform Software Engineer
+    entityType: role-title
+    entityId: platform-engineer
+  - value: Site Reliability
+    entityType: role-title
+    entityId: site-reliability-engineer
+  - value: FDE
+    entityType: role-title
+    entityId: forward-deployed-engineer
+  - value: API integrations
+    entityType: skill
+    entityId: api-integration
+  - value: Continuous Integration and Continuous Delivery
+    entityType: skill
+    entityId: ci-cd
+  - value: Root cause analysis
+    entityType: responsibility
+    entityId: production-troubleshooting
+  - value: SaaS
+    entityType: industry
+    entityId: software-saas
+  - value: Enterprise Technology
+    entityType: industry
+    entityId: enterprise-software

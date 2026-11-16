@@ -1,0 +1,160 @@
+schemaVersion: 1
+taxonomyVersion: 1.0.0
+locale: en-US
+skills:
+  - id: typescript
+    label: TypeScript
+    roleFamilyIds:
+      - software-engineering
+      - full-stack-engineering
+    relatedSkills:
+      - skillId: javascript
+        relationship: specializes-in
+        strength: 0.9
+  - id: javascript
+    label: JavaScript
+    roleFamilyIds:
+      - software-engineering
+      - full-stack-engineering
+    relatedSkills:
+      - skillId: typescript
+        relationship: overlaps
+        strength: 0.88
+  - id: react
+    label: React
+    roleFamilyIds:
+      - full-stack-engineering
+      - product-engineering
+    relatedSkills:
+      - skillId: typescript
+        relationship: complements
+        strength: 0.72
+  - id: nodejs
+    label: Node.js
+    roleFamilyIds:
+      - full-stack-engineering
+      - software-engineering
+    relatedSkills:
+      - skillId: javascript
+        relationship: complements
+        strength: 0.8
+  - id: python
+    label: Python
+    roleFamilyIds:
+      - software-engineering
+      - infrastructure-software
+      - forward-deployed-engineering
+    relatedSkills: []
+  - id: systems-integration-skill
+    label: Systems Integration
+    roleFamilyIds:
+      - systems-integration
+      - application-systems
+    relatedSkills:
+      - skillId: api-integration
+        relationship: overlaps
+        strength: 0.82
+  - id: api-integration
+    label: API Integration
+    roleFamilyIds:
+      - systems-integration
+      - application-systems
+      - implementation-engineering
+    relatedSkills:
+      - skillId: systems-integration-skill
+        relationship: overlaps
+        strength: 0.82
+  - id: ci-cd
+    label: CI/CD
+    roleFamilyIds:
+      - devops
+      - platform-engineering
+      - infrastructure-software
+    relatedSkills:
+      - skillId: automation
+        relationship: complements
+        strength: 0.7
+  - id: networking
+    label: Networking
+    roleFamilyIds:
+      - infrastructure-software
+      - systems-integration
+    relatedSkills: []
+  - id: containers
+    label: Containers
+    roleFamilyIds:
+      - platform-engineering
+      - infrastructure-software
+      - devops
+    relatedSkills:
+      - skillId: cloud-infrastructure
+        relationship: complements
+        strength: 0.74
+  - id: cloud-infrastructure
+    label: Cloud Infrastructure
+    roleFamilyIds:
+      - infrastructure-software
+      - platform-engineering
+      - devops
+    relatedSkills:
+      - skillId: containers
+        relationship: complements
+        strength: 0.74
+      - skillId: observability
+        relationship: complements
+        strength: 0.67
+  - id: observability
+    label: Observability
+    roleFamilyIds:
+      - devops
+      - platform-engineering
+      - infrastructure-software
+    relatedSkills:
+      - skillId: incident-response
+        relationship: complements
+        strength: 0.76
+  - id: incident-response
+    label: Incident Response
+    roleFamilyIds:
+      - systems-integration
+      - infrastructure-software
+      - devops
+    relatedSkills:
+      - skillId: observability
+        relationship: complements
+        strength: 0.76
+  - id: requirements-discovery
+    label: Requirements Discovery
+    roleFamilyIds:
+      - implementation-engineering
+      - forward-deployed-engineering
+      - product-engineering
+    relatedSkills:
+      - skillId: customer-implementation
+        relationship: complements
+        strength: 0.72
+  - id: customer-implementation
+    label: Customer Implementation
+    roleFamilyIds:
+      - implementation-engineering
+      - forward-deployed-engineering
+    relatedSkills:
+      - skillId: requirements-discovery
+        relationship: complements
+        strength: 0.72
+  - id: product-delivery
+    label: Product Delivery
+    roleFamilyIds:
+      - product-engineering
+      - full-stack-engineering
+    relatedSkills: []
+  - id: automation
+    label: Automation
+    roleFamilyIds:
+      - devops
+      - infrastructure-software
+      - implementation-engineering
+    relatedSkills:
+      - skillId: ci-cd
+        relationship: complements
+        strength: 0.7

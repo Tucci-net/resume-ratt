@@ -1,0 +1,112 @@
+schemaVersion: 1
+taxonomyVersion: 1.0.0
+locale: en-US
+responsibilities:
+  - id: end-to-end-software-delivery
+    label: End-to-end software delivery
+    phrases:
+      - Own features from interface through deployment
+      - Deliver software across application layers
+    roleFamilyIds:
+      - software-engineering
+      - full-stack-engineering
+    skillIds:
+      - typescript
+      - python
+      - api-integration
+  - id: product-feature-delivery
+    label: Product feature delivery
+    phrases:
+      - Turn product needs into working software
+      - Ship user-facing product improvements
+    roleFamilyIds:
+      - product-engineering
+      - full-stack-engineering
+    skillIds:
+      - react
+      - product-delivery
+  - id: systems-integration
+    label: Systems integration
+    phrases:
+      - Connect applications, services, and data
+      - Integrate APIs across system boundaries
+    roleFamilyIds:
+      - systems-integration
+      - application-systems
+    skillIds:
+      - systems-integration-skill
+      - api-integration
+      - networking
+  - id: deployment-automation
+    label: Deployment automation
+    phrases:
+      - Automate build and release workflows
+      - Improve repeatable software deployment
+    roleFamilyIds:
+      - devops
+      - infrastructure-software
+      - platform-engineering
+    skillIds:
+      - ci-cd
+      - automation
+      - cloud-infrastructure
+  - id: platform-enablement
+    label: Platform enablement
+    phrases:
+      - Build paved paths for engineering teams
+      - Improve developer platform capabilities
+    roleFamilyIds:
+      - platform-engineering
+      - infrastructure-software
+    skillIds:
+      - containers
+      - cloud-infrastructure
+      - observability
+  - id: production-troubleshooting
+    label: Production troubleshooting
+    phrases:
+      - Diagnose and resolve production issues
+      - Monitor and improve system reliability
+    roleFamilyIds:
+      - devops
+      - infrastructure-software
+      - systems-integration
+    skillIds:
+      - observability
+      - incident-response
+      - networking
+  - id: application-systems-implementation
+    label: Application systems implementation
+    phrases:
+      - Configure and connect business applications
+      - Implement integrated application workflows
+    roleFamilyIds:
+      - application-systems
+      - implementation-engineering
+    skillIds:
+      - api-integration
+      - requirements-discovery
+      - customer-implementation
+  - id: customer-technical-discovery
+    label: Customer technical discovery
+    phrases:
+      - Translate customer requirements into technical plans
+      - Discover integration needs in customer environments
+    roleFamilyIds:
+      - implementation-engineering
+      - forward-deployed-engineering
+    skillIds:
+      - requirements-discovery
+      - customer-implementation
+  - id: forward-deployed-delivery
+    label: Forward-deployed delivery
+    phrases:
+      - Deliver software directly into customer environments
+      - Adapt software to high-context customer problems
+    roleFamilyIds:
+      - forward-deployed-engineering
+      - implementation-engineering
+    skillIds:
+      - python
+      - customer-implementation
+      - api-integration

@@ -17,6 +17,12 @@ export function Header() {
             href="/dashboard"
             className="hover:text-black dark:hover:text-white"
           >
+            Career profile
+          </Link>
+          <Link
+            href="/resume"
+            className="hover:text-black dark:hover:text-white"
+          >
             Resume builder
           </Link>
           <Link
