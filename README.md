@@ -6,6 +6,13 @@ live preview and browser-based printing.
 ## Current behavior
 
 - Resume drafts and Career Library data are stored in browser-local storage.
+  Résumé content edits synchronize into canonical Career Library records;
+  drafts keep references to those records. Career Library JSON/Markdown imports
+  reconcile by ID and revision, rejecting stale edits rather than overwriting
+  newer changes.
+- **Import Resume** accepts pasted plain text, Markdown, and JSON. Recognized
+  sections are shown in a review step where items can be edited, selected, or
+  rejected before approval saves them to the Career Library.
 - The Career Profile dashboard loads a validated Markdown/YAML profile by its
   stable profile ID. Local development automatically selects the Tanner seed
   profile from `profiles/profile-tanner.md`.

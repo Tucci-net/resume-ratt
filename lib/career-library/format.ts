@@ -7,6 +7,7 @@ import type {
 
 const ITEM_TYPES = new Set<CareerLibraryItemType>([
   "accomplishment",
+  "experience",
   "project",
   "skill",
   "summary",

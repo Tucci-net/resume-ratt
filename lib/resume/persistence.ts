@@ -25,6 +25,7 @@ const sectionIds = [
 ] as const satisfies readonly ResumeSectionId[];
 const libraryItemTypes = [
   "accomplishment",
+  "experience",
   "project",
   "skill",
   "summary",
@@ -79,6 +80,7 @@ const resumeReferenceSchema = z.object({
   section: z.enum(sectionIds),
   relationship: z.enum(["copy", "reference"]),
   resumeText: z.string(),
+  libraryItemUpdatedAt: z.string().datetime().optional(),
 });
 const resumeSchema = z.object({
   name: z.string(),

@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from "react";
 import type { ChangeEvent, Dispatch, ReactNode, SetStateAction } from "react";
-import { Download, Plus, Trash2, Upload } from "lucide-react";
+import { Download, FileText, Plus, Trash2, Upload, X } from "lucide-react";
 import { AccordionSection } from "@/components/features/accordion-section";
-import { useCareerLibrary } from "@/hooks/use-career-library";
+import type { useCareerLibrary } from "@/hooks/use-career-library";
 import {
   parseCareerLibraryJson,
   parseCareerLibraryMarkdown,
   serializeCareerLibraryJson,
   serializeCareerLibraryMarkdown,
 } from "@/lib/career-library/format";
-import { mergeCareerLibraryItems } from "@/lib/career-library/merge";
+import { reconcileCareerLibraryItems } from "@/lib/career-library/merge";
 import { splitResumeItems } from "@/lib/resume/format";
+import {
+  parseResumeJson,
+  parseResumeText,
+} from "@/lib/resume/import";
+import type { ResumeImportCandidate } from "@/lib/resume/import";
 import type {
   CareerLibraryItem,
   CareerLibraryItemType,
@@ -25,6 +30,7 @@ import { RESUME_SECTION_LABELS } from "@/lib/resume/sections";
 
 const TYPES: CareerLibraryItemType[] = [
   "accomplishment",
+  "experience",
   "project",
   "skill",
   "summary",
@@ -42,9 +48,16 @@ const INPUT_CLASS =
 export function CareerLibraryPanel({
   resume,
   setResume,
+  careerLibrary,
+  onLibraryItemUpdate,
 }: {
   resume: ResumeContent;
   setResume: Dispatch<SetStateAction<ResumeContent>>;
+  careerLibrary: ReturnType<typeof useCareerLibrary>;
+  onLibraryItemUpdate: (
+    previous: CareerLibraryItem,
+    updated: CareerLibraryItem,
+  ) => void;
 }) {
   const {
     items,
@@ -54,7 +67,7 @@ export function CareerLibraryPanel({
     setError,
     updateItems,
     startFreshAfterRecovery,
-  } = useCareerLibrary();
+  } = careerLibrary;
   const [newType, setNewType] =
     useState<CareerLibraryItemType>("accomplishment");
   const [newText, setNewText] = useState("");
@@ -63,6 +76,13 @@ export function CareerLibraryPanel({
   const [newMetrics, setNewMetrics] = useState("");
   const [newSource, setNewSource] = useState("");
   const [notice, setNotice] = useState("");
+  const [isResumeImportOpen, setIsResumeImportOpen] = useState(false);
+  const [resumeImportText, setResumeImportText] = useState("");
+  const [resumeImportCandidates, setResumeImportCandidates] = useState<
+    ResumeImportCandidate[]
+  >([]);
+  const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
+  const [resumeImportError, setResumeImportError] = useState("");
 
   function addItem() {
     const canonicalText = newText.trim();
@@ -94,6 +114,20 @@ export function CareerLibraryPanel({
   }
 
   function updateItem(id: string, patch: Partial<CareerLibraryItem>) {
+    const previous = items.find((item) => item.id === id);
+    if (previous) {
+      const updated = {
+        ...previous,
+        ...patch,
+        id: previous.id,
+        updatedAt: new Date().toISOString(),
+      };
+      onLibraryItemUpdate(previous, updated);
+      updateItems((current) =>
+        current.map((item) => (item.id === id ? updated : item)),
+      );
+      return;
+    }
     updateItems((current) =>
       current.map((item) =>
         item.id === id
@@ -108,6 +142,14 @@ export function CareerLibraryPanel({
     resumeText: string,
     relationship: "copy" | "reference",
   ) {
+    if (
+      resume.careerLibraryReferences.some(
+        (reference) => reference.libraryItemId === item.id,
+      )
+    ) {
+      setError("This Career Library item is already used in this resume.");
+      return;
+    }
     const wording = resumeText.trim();
     if (!wording) {
       setError("Resume-specific wording cannot be empty.");
@@ -120,11 +162,30 @@ export function CareerLibraryPanel({
       section,
       relationship,
       resumeText: wording,
+      libraryItemUpdatedAt: item.updatedAt,
     };
 
     setResume((current) => {
       let updated: ResumeContent = { ...current };
       switch (item.type) {
+        case "experience":
+          updated = {
+            ...updated,
+            experience: [
+              ...current.experience,
+              {
+                id: item.id,
+                employer: "",
+                jobTitle: wording,
+                location: "",
+                startDate: "",
+                endDate: "",
+                currentRole: false,
+                accomplishments: [],
+              },
+            ],
+          };
+          break;
         case "accomplishment": {
           const experience = [...current.experience];
           const lastIndex = experience.length - 1;
@@ -155,7 +216,7 @@ export function CareerLibraryPanel({
             projects: [
               ...current.projects,
               {
-                id: crypto.randomUUID(),
+                id: item.id,
                 name: wording,
                 subtitle: "",
                 startDate: "",
@@ -187,7 +248,7 @@ export function CareerLibraryPanel({
             education: [
               ...current.education,
               {
-                id: crypto.randomUUID(),
+                id: item.id,
                 institution: wording,
                 degree: "",
                 fieldOfStudy: "",
@@ -207,7 +268,7 @@ export function CareerLibraryPanel({
             certifications: [
               ...current.certifications,
               {
-                id: crypto.randomUUID(),
+                id: item.id,
                 name: wording,
                 issuer: "",
                 issueDate: "",
@@ -248,11 +309,25 @@ export function CareerLibraryPanel({
       const imported = lowerName.endsWith(".json")
         ? parseCareerLibraryJson(contents)
         : parseCareerLibraryMarkdown(contents);
-      const { added, skipped } = mergeCareerLibraryItems(items, imported);
-      updateItems((current) => mergeCareerLibraryItems(current, imported).items);
+      const reconciliation = reconcileCareerLibraryItems(items, imported);
+      const changedItems = reconciliation.items.filter((item) => {
+        const previous = items.find((current) => current.id === item.id);
+        return (
+          previous &&
+          (previous.updatedAt !== item.updatedAt ||
+            previous.canonicalText !== item.canonicalText)
+        );
+      });
+      for (const item of changedItems) {
+        const previous = items.find((entry) => entry.id === item.id);
+        if (previous) onLibraryItemUpdate(previous, item);
+      }
+      updateItems((current) =>
+        reconcileCareerLibraryItems(current, imported).items,
+      );
       setError("");
       setNotice(
-        `Imported ${added} item${added === 1 ? "" : "s"}; skipped ${skipped} existing ID${skipped === 1 ? "" : "s"} without overwriting them.`,
+        `Imported ${reconciliation.added}, updated ${reconciliation.updated}, skipped ${reconciliation.skipped}, and protected ${reconciliation.conflicts} conflicting item${reconciliation.conflicts === 1 ? "" : "s"}.`,
       );
     } catch (importError) {
       setError(
@@ -261,6 +336,82 @@ export function CareerLibraryPanel({
           : "The Career Library file could not be imported.",
       );
     }
+  }
+
+  function parseResumeImport(contents = resumeImportText, filename = "") {
+    try {
+      const lowerName = filename.toLowerCase();
+      const candidates =
+        lowerName.endsWith(".json") || contents.trimStart().startsWith("{")
+          ? parseResumeJson(contents)
+          : parseResumeText(contents);
+      if (candidates.length === 0) {
+        throw new Error(
+          "No résumé sections were recognized. Use headings such as Summary, Experience, Education, Projects, Skills, or Certifications.",
+        );
+      }
+      setResumeImportCandidates(candidates);
+      setSelectedImportIds(candidates.map((candidate) => candidate.id));
+      setResumeImportError("");
+    } catch (parseError) {
+      setResumeImportCandidates([]);
+      setSelectedImportIds([]);
+      setResumeImportError(
+        parseError instanceof Error
+          ? parseError.message
+          : "The résumé could not be parsed.",
+      );
+    }
+  }
+
+  async function loadResumeImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    try {
+      const contents = await file.text();
+      setResumeImportText(contents);
+      parseResumeImport(contents, file.name);
+    } catch (readError) {
+      setResumeImportError(
+        readError instanceof Error
+          ? readError.message
+          : "The résumé file could not be read.",
+      );
+    }
+  }
+
+  function approveResumeImport() {
+    const chosen = resumeImportCandidates.filter((candidate) =>
+      selectedImportIds.includes(candidate.id),
+    );
+    if (chosen.length === 0) {
+      setResumeImportError("Select at least one item to import.");
+      return;
+    }
+    const now = new Date().toISOString();
+    const importedItems: CareerLibraryItem[] = chosen.map((candidate) => ({
+      id: candidate.id,
+      type: candidate.type,
+      canonicalText: candidate.text.trim(),
+      tags: [candidate.section],
+      skills: [],
+      metrics: [],
+      source: "Résumé import",
+      verificationStatus: "unverified",
+      createdAt: now,
+      updatedAt: now,
+    }));
+    updateItems((current) => [...current, ...importedItems]);
+    setResume((current) => appendImportedItems(current, importedItems));
+    setNotice(
+      `Added ${importedItems.length} reviewed item${importedItems.length === 1 ? "" : "s"} to the Career Library.`,
+    );
+    setResumeImportCandidates([]);
+    setSelectedImportIds([]);
+    setResumeImportText("");
+    setResumeImportError("");
+    setIsResumeImportOpen(false);
   }
 
   function exportFile(format: "json" | "md") {
@@ -316,6 +467,14 @@ export function CareerLibraryPanel({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => setIsResumeImportOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-md bg-black px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+                >
+                  <FileText className="h-4 w-4" />
+                  Import Resume
+                </button>
+                <button
+                  type="button"
                   onClick={() => exportFile("json")}
                   className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
                 >
@@ -341,6 +500,127 @@ export function CareerLibraryPanel({
                   />
                 </label>
               </div>
+
+              {isResumeImportOpen && (
+                <section
+                  aria-label="Import Resume"
+                  className="rounded-lg border border-blue-300 bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-medium">Import Resume</h3>
+                      <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+                        Paste text or load a Markdown, text, or JSON résumé.
+                        Nothing is saved until you review and approve it.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Close resume import"
+                      onClick={() => setIsResumeImportOpen(false)}
+                      className="rounded p-1 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <textarea
+                    aria-label="Résumé text to import"
+                    value={resumeImportText}
+                    onChange={(event) => {
+                      setResumeImportText(event.target.value);
+                      setResumeImportCandidates([]);
+                    }}
+                    rows={8}
+                    placeholder={"Summary\n...\n\nExperience\n..."}
+                    className={INPUT_CLASS}
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => parseResumeImport()}
+                      className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+                    >
+                      Review pasted text
+                    </button>
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
+                      <Upload className="h-4 w-4" />
+                      Choose Markdown / JSON
+                      <input
+                        type="file"
+                        accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json"
+                        onChange={loadResumeImportFile}
+                        className="sr-only"
+                      />
+                    </label>
+                  </div>
+                  {resumeImportError && (
+                    <p role="alert" className="mt-3 text-sm text-red-600">
+                      {resumeImportError}
+                    </p>
+                  )}
+                  {resumeImportCandidates.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <h4 className="text-sm font-semibold">Review Import</h4>
+                      {resumeImportCandidates.map((candidate) => (
+                        <article
+                          key={candidate.id}
+                          className="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
+                        >
+                          <label className="flex items-center gap-2 text-sm font-medium">
+                            <input
+                              type="checkbox"
+                              checked={selectedImportIds.includes(candidate.id)}
+                              onChange={(event) =>
+                                setSelectedImportIds((current) =>
+                                  event.target.checked
+                                    ? [...current, candidate.id]
+                                    : current.filter((id) => id !== candidate.id),
+                                )
+                              }
+                            />
+                            {candidate.section} · {candidate.type}
+                          </label>
+                          <textarea
+                            aria-label={`Edit ${candidate.section} import item`}
+                            value={candidate.text}
+                            onChange={(event) =>
+                              setResumeImportCandidates((current) =>
+                                current.map((item) =>
+                                  item.id === candidate.id
+                                    ? { ...item, text: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            rows={3}
+                            className={INPUT_CLASS}
+                          />
+                        </article>
+                      ))}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={approveResumeImport}
+                          className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+                        >
+                          Approve and save selected items
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResumeImportCandidates([]);
+                            setSelectedImportIds([]);
+                            setResumeImportError("");
+                          }}
+                          className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+                        >
+                          Reject parsed items
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
 
               <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
                 <h3 className="font-medium">Add canonical item</h3>
@@ -457,6 +737,124 @@ export function CareerLibraryPanel({
       </AccordionSection>
     </section>
   );
+}
+
+function appendImportedItems(
+  resume: ResumeContent,
+  items: CareerLibraryItem[],
+): ResumeContent {
+  const updated: ResumeContent = { ...resume };
+  for (const item of items) {
+    const lines = item.canonicalText.split("\n").map((line) => line.trim());
+    const firstLine = lines[0] ?? item.canonicalText;
+    switch (item.type) {
+      case "summary":
+        updated.summary = [updated.summary.trim(), item.canonicalText]
+          .filter(Boolean)
+          .join("\n\n");
+        break;
+      case "experience": {
+        const [jobTitle, employer] = firstLine.split(/\s+[—–-]\s+/, 2);
+        updated.experience = [
+          ...updated.experience,
+          {
+            id: item.id,
+            jobTitle: jobTitle ?? firstLine,
+            employer: employer ?? "",
+            location: "",
+            startDate: "",
+            endDate: "",
+            currentRole: false,
+            accomplishments: lines.slice(1).filter(Boolean),
+          },
+        ];
+        break;
+      }
+      case "accomplishment":
+        updated.experience = [
+          ...updated.experience,
+          {
+            id: item.id,
+            employer: "",
+            jobTitle: "",
+            location: "",
+            startDate: "",
+            endDate: "",
+            currentRole: false,
+            accomplishments: [item.canonicalText],
+          },
+        ];
+        break;
+      case "project":
+        updated.projects = [
+          ...updated.projects,
+          {
+            id: item.id,
+            name: firstLine,
+            subtitle: "",
+            startDate: "",
+            endDate: "",
+            url: "",
+            description: lines.slice(1).filter(Boolean).join("\n"),
+            accomplishments: [],
+          },
+        ];
+        break;
+      case "education":
+        updated.education = [
+          ...updated.education,
+          {
+            id: item.id,
+            institution: firstLine,
+            degree: "",
+            fieldOfStudy: "",
+            location: "",
+            startDate: "",
+            endDate: "",
+            currentlyEnrolled: false,
+            gpa: "",
+            honors: lines.slice(1).filter(Boolean).join("\n"),
+          },
+        ];
+        break;
+      case "skill": {
+        const skills = splitResumeItems(updated.skills);
+        for (const skill of splitResumeItems(item.canonicalText)) {
+          if (!skills.some((existing) => existing.toLowerCase() === skill.toLowerCase())) {
+            skills.push(skill);
+          }
+        }
+        updated.skills = skills.join(", ");
+        break;
+      }
+      case "certification":
+        updated.certifications = [
+          ...updated.certifications,
+          {
+            id: item.id,
+            name: firstLine,
+            issuer: "",
+            issueDate: "",
+            expirationDate: "",
+            credentialId: "",
+            credentialUrl: "",
+          },
+        ];
+        break;
+    }
+  }
+  updated.careerLibraryReferences = [
+    ...resume.careerLibraryReferences,
+    ...items.map((item) => ({
+      libraryItemId: item.id,
+      type: item.type,
+      section: getTargetSection(item.type),
+      relationship: "reference" as const,
+      resumeText: item.canonicalText,
+      libraryItemUpdatedAt: item.updatedAt,
+    })),
+  ];
+  return updated;
 }
 
 function CareerLibraryItemCard({
@@ -649,6 +1047,8 @@ function parseList(value: string): string[] {
 
 function getTargetSection(type: CareerLibraryItemType): ResumeSectionId {
   switch (type) {
+    case "experience":
+      return "experience";
     case "accomplishment":
       return "experience";
     case "project":

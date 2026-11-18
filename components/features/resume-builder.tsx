@@ -19,6 +19,7 @@ import { ResumeContentEditor } from "@/components/features/resume-content-editor
 import { ResumeDocument } from "@/components/features/resume-document";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useResumeDrafts } from "@/hooks/use-resume-drafts";
+import { useCareerLibrary } from "@/hooks/use-career-library";
 import {
   DEFAULT_RESUME_DESIGN,
   INITIAL_RESUME,
@@ -29,6 +30,10 @@ import type {
   ResumeFontOption,
   ResumeSectionConfig,
 } from "@/lib/resume/model";
+import {
+  syncReferencedResume,
+  syncResumeContentToCareerLibrary,
+} from "@/lib/resume/library-sync";
 import {
   isSupportedTtf,
   MAX_TTF_FILE_SIZE,
@@ -52,6 +57,7 @@ const INPUT_CLASS =
   "mt-1.5 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-neutral-700";
 
 export function ResumeBuilder() {
+  const careerLibrary = useCareerLibrary();
   const {
     store,
     activeDraft,
@@ -61,7 +67,8 @@ export function ResumeBuilder() {
     warnings,
     saveError,
     status,
-    setResume,
+    setResume: setDraftResume,
+    updateDrafts,
     setDesign,
     setSections,
     selectDraft,
@@ -85,6 +92,56 @@ export function ResumeBuilder() {
     RESUME_FONTS.find((font) => font.id === design.fontFamily) ??
     uploadedFonts.find((font) => font.id === design.fontFamily) ??
     RESUME_FONTS[0]!;
+
+  function setResume(
+    action: Parameters<typeof setDraftResume>[0],
+  ) {
+    const updated =
+      typeof action === "function" ? action(resume) : action;
+    if (!activeDraft) {
+      setDraftResume(updated);
+      return;
+    }
+    const synchronized = syncResumeContentToCareerLibrary(
+      resume,
+      updated,
+      careerLibrary.items,
+      activeDraft.id,
+    );
+    const changedItems = synchronized.items.filter((item) => {
+      const previous = careerLibrary.items.find(
+        (current) => current.id === item.id,
+      );
+      return (
+        !previous ||
+        previous.updatedAt !== item.updatedAt ||
+        previous.canonicalText !== item.canonicalText
+      );
+    });
+    updateDrafts((drafts) =>
+      drafts.map((draft) => {
+        if (draft.id === activeDraft.id) {
+          return {
+            ...draft,
+            resume: synchronized.resume,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        const resume = changedItems.reduce((currentResume, item) => {
+          const previous = careerLibrary.items.find(
+            (current) => current.id === item.id,
+          );
+          return previous
+            ? syncReferencedResume(currentResume, previous, item)
+            : currentResume;
+        }, draft.resume);
+        return resume === draft.resume
+          ? draft
+          : { ...draft, resume, updatedAt: new Date().toISOString() };
+      }),
+    );
+    careerLibrary.updateItems(() => synchronized.items);
+  }
 
   useEffect(() => {
     setDraftNameInput(activeDraft?.name ?? "");
@@ -256,8 +313,8 @@ export function ResumeBuilder() {
   return (
     <main
       className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8"
-      inert={!isLoaded}
-      aria-busy={!isLoaded}
+      inert={!isLoaded || !careerLibrary.isLoaded}
+      aria-busy={!isLoaded || !careerLibrary.isLoaded}
     >
       <div className="resume-builder-header mb-6">
         <div>
@@ -552,7 +609,25 @@ export function ResumeBuilder() {
               </AccordionSection>
             </div>
           </div>
-          <CareerLibraryPanel resume={resume} setResume={setResume} />
+          <CareerLibraryPanel
+            resume={resume}
+            setResume={setDraftResume}
+            careerLibrary={careerLibrary}
+            onLibraryItemUpdate={(previous, updated) =>
+              updateDrafts((drafts) =>
+                drafts.map((draft) => {
+                  const resume = syncReferencedResume(
+                    draft.resume,
+                    previous,
+                    updated,
+                  );
+                  return resume === draft.resume
+                    ? draft
+                    : { ...draft, resume, updatedAt: new Date().toISOString() };
+                }),
+              )
+            }
+          />
         </section>
 
         <div>

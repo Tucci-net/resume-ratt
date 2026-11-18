@@ -45,6 +45,7 @@ export type ResumeCertification = {
 
 export type CareerLibraryItemType =
   | "accomplishment"
+  | "experience"
   | "project"
   | "skill"
   | "summary"
@@ -80,6 +81,7 @@ export type ResumeLibraryReference = {
   section: ResumeSectionId;
   relationship: "copy" | "reference";
   resumeText: string;
+  libraryItemUpdatedAt?: string;
 };
 
 export type ResumeContent = {

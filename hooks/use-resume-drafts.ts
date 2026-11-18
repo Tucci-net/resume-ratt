@@ -108,6 +108,16 @@ export function useResumeDrafts() {
     [],
   );
 
+  const updateDrafts = useCallback(
+    (update: (drafts: ResumeDraft[]) => ResumeDraft[]) => {
+      setStore((current) => ({
+        ...current,
+        drafts: update(current.drafts),
+      }));
+    },
+    [],
+  );
+
   const setResume = useCallback(
     (action: SetStateAction<ResumeContent>) => {
       updateActiveDraft((draft) => ({
@@ -228,6 +238,7 @@ export function useResumeDrafts() {
     setDesign,
     setSections,
     updateActiveDraft,
+    updateDrafts,
     selectDraft,
     createDraft,
     duplicateActiveDraft,
