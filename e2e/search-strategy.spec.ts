@@ -1,11 +1,14 @@
-import { readFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+
+const PROFILE_ID = "synthetic-e2e-user";
 
 test("reviews and persists a search decision separately from the CareerProfile", async ({
   page,
 }) => {
+  test.skip(
+    process.env.RESUME_RATT_E2E_PRODUCTION === "true",
+    "Search preference Markdown edits are available only in the development server.",
+  );
   await page.goto("/search-strategy");
   await expect(
     page.getByRole("heading", { name: "Search Strategy" }),
@@ -30,7 +33,7 @@ test("reviews and persists a search decision separately from the CareerProfile",
 
   const saveResponse = page.waitForResponse(
     (response) =>
-      response.url().includes("/api/search-strategies/profile-tanner") &&
+      response.url().includes(`/api/search-strategies/${PROFILE_ID}`) &&
       response.request().method() === "PUT",
   );
   await page.getByRole("button", { name: "Save search decisions" }).click();
@@ -39,17 +42,26 @@ test("reviews and persists a search decision separately from the CareerProfile",
     page.getByRole("status").getByText(/Search preferences saved/),
   ).toBeVisible();
 
-  const profileDirectory = path.join(os.tmpdir(), "resume-ratt-e2e-profile");
-  const preferencesMarkdown = await readFile(
-    path.join(profileDirectory, "profile-tanner", "search-preferences.md"),
-    "utf8",
-  );
-  const careerProfileMarkdown = await readFile(
-    path.join(profileDirectory, "profile-tanner.md"),
-    "utf8",
-  );
-  expect(preferencesMarkdown).toContain("QA Search Strategy Engineer");
-  expect(careerProfileMarkdown).not.toContain("QA Search Strategy Engineer");
+  const [savedStrategyResponse, profileMarkdownResponse] = await Promise.all([
+    page.request.get(`/api/search-strategies/${PROFILE_ID}`),
+    page.request.get(`/api/career-profiles/${PROFILE_ID}?format=markdown`),
+  ]);
+  expect(savedStrategyResponse.ok()).toBe(true);
+  expect(profileMarkdownResponse.ok()).toBe(true);
+  const savedStrategy = (await savedStrategyResponse.json()) as {
+    preferences: {
+      terms: Array<{ value: string; status: string }>;
+    };
+  };
+  const profileMarkdown = await profileMarkdownResponse.text();
+  expect(
+    savedStrategy.preferences.terms.some(
+      (term) =>
+        term.value === "QA Search Strategy Engineer" &&
+        term.status === "approved",
+    ),
+  ).toBe(true);
+  expect(profileMarkdown).not.toContain("QA Search Strategy Engineer");
 
   await page.reload();
   await expect(

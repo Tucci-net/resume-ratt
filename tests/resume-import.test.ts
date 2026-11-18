@@ -49,6 +49,26 @@ Accessibility Specialist`);
     expect(candidates[1]?.text).toContain("company: Example Co");
   });
 
+  it("marks restricted JSON evidence for exclusion from default review selection", () => {
+    const candidates = parseResumeJson(
+      JSON.stringify({
+        experience: [
+          { title: "Engineer", company: "Example Co" },
+          {
+            title: "Internal project",
+            company: "Example Co",
+            restricted: true,
+          },
+        ],
+      }),
+    );
+
+    expect(candidates.map(({ text, restricted }) => [text, restricted])).toEqual([
+      ["title: Engineer\ncompany: Example Co", false],
+      ["title: Internal project\ncompany: Example Co", true],
+    ]);
+  });
+
   it("rejects JSON without recognizable résumé fields", () => {
     expect(() => parseResumeJson('{"name":"Sam"}')).toThrow(
       "must include summary",

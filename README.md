@@ -5,17 +5,34 @@ live preview and browser-based printing.
 
 ## Current behavior
 
-- Resume drafts and Career Library data are stored in browser-local storage.
-  Résumé content edits synchronize into canonical Career Library records;
-  drafts keep references to those records. Career Library JSON/Markdown imports
-  reconcile by ID and revision, rejecting stale edits rather than overwriting
-  newer changes.
+- Résumé drafts, Career Library data, and submitted snapshots are stored in
+  browser-local storage. Their authority boundaries are intentional:
+  - **Career Library — Canonical Career Evidence:** factual claims and evidence
+    IDs, with versioned canonical revisions and proposed wording variants.
+  - **Working Draft — Application Presentation:** a mutable, materialized
+    presentation snapshot with selected evidence IDs, wording, layout, and
+    source revisions. Its duplicated content is intentional for versioning,
+    application reproducibility, and auditability; draft edits never silently
+    change canonical evidence.
+  - **Submitted Snapshot — Immutable History:** submission content and the
+    exact Career Library IDs, evidence IDs, variants, canonical revisions, and
+    evidence text used at submission. Later draft or Career Library edits do
+    not rewrite a snapshot.
+- Canonical revisions changing flag linked working drafts as stale without
+  rewriting their presentation. Draft wording can be kept draft-only or
+  explicitly proposed as a Career Library wording variant.
+- Career Library JSON/Markdown imports reconcile by ID and revision, rejecting
+  stale edits rather than overwriting newer changes.
 - **Import Resume** accepts pasted plain text, Markdown, and JSON. Recognized
   sections are shown in a review step where items can be edited, selected, or
   rejected before approval saves them to the Career Library.
+- Restricted JSON résumé evidence is unchecked by default in that review step
+  and is saved only when explicitly selected.
 - The Career Profile dashboard loads a validated Markdown/YAML profile by its
   stable profile ID. Local development automatically selects the Tanner seed
   profile from `profiles/profile-tanner.md`.
+- Playwright uses a generated temporary directory and the synthetic fixture in
+  `e2e/fixtures`; it never writes to the development seed profile.
 - Profile changes are staged, validated, and require explicit approval before
   the Markdown source is updated. This file-backed write path is development
   only; production edits require a durable repository implementation.

@@ -5,6 +5,7 @@ export type ResumeImportCandidate = {
   type: CareerLibraryItemType;
   section: string;
   text: string;
+  restricted: boolean;
 };
 
 const SECTION_TYPES: Record<string, CareerLibraryItemType> = {
@@ -59,6 +60,7 @@ export function parseResumeText(input: string): ResumeImportCandidate[] {
       type,
       section: title,
       text,
+      restricted: false,
     }));
   });
 }
@@ -75,28 +77,46 @@ export function parseResumeJson(input: string): ResumeImportCandidate[] {
     throw new Error("The résumé JSON must contain an object.");
   }
 
-  const entries: string[] = [];
-  const sectionKeys: Array<[string, string[]]> = [
-    ["summary", ["summary", "profile", "objective"]],
-    ["experience", ["experience", "employment", "workExperience", "work_history"]],
-    ["education", ["education"]],
-    ["projects", ["projects"]],
-    ["skills", ["skills", "competencies"]],
-    ["certifications", ["certifications", "certificates"]],
+  const sectionKeys: Array<[string, string[], boolean]> = [
+    ["summary", ["summary", "profile", "objective"], false],
+    [
+      "experience",
+      ["experience", "employment", "workExperience", "work_history"],
+      true,
+    ],
+    ["education", ["education"], true],
+    ["projects", ["projects"], true],
+    ["skills", ["skills", "competencies"], false],
+    ["certifications", ["certifications", "certificates"], true],
   ];
+  const candidates: ResumeImportCandidate[] = [];
 
-  for (const [heading, keys] of sectionKeys) {
+  for (const [heading, keys, splitCollection] of sectionKeys) {
     const key = keys.find((candidate) => Object.hasOwn(value, candidate));
     if (!key) continue;
-    entries.push(heading, flattenValue(value[key]).join("\n\n"));
+    const sectionValue = value[key];
+    const values =
+      splitCollection && Array.isArray(sectionValue)
+        ? sectionValue
+        : [sectionValue];
+    for (const entry of values) {
+      const text = flattenValue(entry).join("\n\n");
+      if (!text.trim()) continue;
+      candidates.push(
+        ...parseResumeText(`${heading}\n${text}`).map((candidate) => ({
+          ...candidate,
+          restricted: isRestricted(entry),
+        })),
+      );
+    }
   }
 
-  if (entries.length === 0) {
+  if (candidates.length === 0) {
     throw new Error(
       "The résumé JSON must include summary, experience, education, projects, skills, or certifications.",
     );
   }
-  return parseResumeText(entries.join("\n"));
+  return candidates;
 }
 
 function normalizeHeading(line: string): string {
@@ -139,7 +159,13 @@ function flattenValue(value: unknown): string[] {
   }
   if (isRecord(value)) {
     const text = Object.entries(value)
-      .filter(([, entry]) => entry !== null && entry !== undefined)
+      .filter(
+        ([key, entry]) =>
+          key !== "restricted" &&
+          key !== "sensitivity" &&
+          entry !== null &&
+          entry !== undefined,
+      )
       .map(([key, entry]) => {
         const label = key.replace(/([A-Z])/g, " $1").replace(/_/g, " ");
         const valueText = flattenValue(entry).join(", ");
@@ -153,6 +179,15 @@ function flattenValue(value: unknown): string[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isRestricted(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value.restricted === true ||
+      (typeof value.sensitivity === "string" &&
+        value.sensitivity.toLowerCase() === "restricted"))
+  );
 }
 
 function createId(): string {

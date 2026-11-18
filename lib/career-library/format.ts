@@ -2,8 +2,10 @@ import type {
   CareerLibraryDocument,
   CareerLibraryItem,
   CareerLibraryItemType,
+  CareerLibraryVariant,
   CareerLibraryVerificationStatus,
 } from "@/lib/resume/model";
+import { z } from "zod";
 
 const ITEM_TYPES = new Set<CareerLibraryItemType>([
   "accomplishment",
@@ -20,6 +22,13 @@ const VERIFICATION_STATUSES = new Set<CareerLibraryVerificationStatus>([
   "verified",
 ]);
 const MARKDOWN_DOCUMENT_SEPARATOR = "\n\n<!-- career-library-item -->\n\n";
+const variantSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+  status: z.enum(["proposed", "approved", "rejected"]),
+  sourceDraftId: z.string().optional(),
+  createdAt: z.string().datetime(),
+});
 
 export function serializeCareerLibraryJson(
   items: CareerLibraryItem[],
@@ -68,15 +77,22 @@ export function serializeCareerLibraryMarkdown(
       const frontMatter = [
         `id: ${yamlString(item.id)}`,
         `type: ${item.type}`,
+        ...(item.canonicalRevisionId
+          ? [`canonicalRevisionId: ${yamlString(item.canonicalRevisionId)}`]
+          : []),
         `tags: ${yamlArray(item.tags)}`,
         `skills: ${yamlArray(item.skills)}`,
         `metrics: ${yamlArray(item.metrics)}`,
+        ...(item.restricted ? ["restricted: true"] : []),
         ...(item.source === undefined
           ? []
           : [`source: ${yamlString(item.source)}`]),
         `verificationStatus: ${item.verificationStatus}`,
         `createdAt: ${yamlString(item.createdAt)}`,
         `updatedAt: ${yamlString(item.updatedAt)}`,
+        ...(item.variants
+          ? [`variants: ${yamlString(JSON.stringify(item.variants))}`]
+          : []),
       ].join("\n");
 
       return `---\n${frontMatter}\n---\n\n${item.canonicalText.trim()}`;
@@ -165,6 +181,8 @@ function parseFrontMatter(lines: string[]): Record<string, unknown> {
 }
 
 function parseYamlValue(value: string): unknown {
+  if (value === "true") return true;
+  if (value === "false") return false;
   if (value.startsWith('"')) {
     try {
       return JSON.parse(value) as unknown;
@@ -252,6 +270,33 @@ function validateCareerLibraryItem(
     updatedAt: requiredTimestamp(value.updatedAt, `${label}.updatedAt`),
   };
 
+  if (value.canonicalRevisionId !== undefined) {
+    item.canonicalRevisionId = requiredString(
+      value.canonicalRevisionId,
+      `${label}.canonicalRevisionId`,
+    );
+  }
+  if (value.restricted !== undefined) {
+    if (typeof value.restricted !== "boolean") {
+      throw new Error(`${label}.restricted must be a boolean.`);
+    }
+    item.restricted = value.restricted;
+  }
+  if (value.variants !== undefined) {
+    let variants: unknown = value.variants;
+    if (typeof variants === "string") {
+      try {
+        variants = JSON.parse(variants) as unknown;
+      } catch {
+        throw new Error(`${label}.variants must be valid JSON.`);
+      }
+    }
+    const parsedVariants = z.array(variantSchema).safeParse(variants);
+    if (!parsedVariants.success) {
+      throw new Error(`${label}.variants has an invalid variant.`);
+    }
+    item.variants = parsedVariants.data as CareerLibraryVariant[];
+  }
   if (value.source !== undefined && value.source !== "") {
     item.source = requiredString(value.source, `${label}.source`);
   }

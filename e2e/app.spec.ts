@@ -15,8 +15,8 @@ test("serves the homepage, career profile, and resume builder", async ({ request
   expect(homeResponse.ok()).toBe(true);
   expect(home).toContain("Job hunting is a rat race.");
   expect(profileResponse.ok()).toBe(true);
-  expect(profile).toContain("Tanner C. Tucci");
-  expect(profile).toContain("Full-Stack Systems Engineer");
+  expect(profile).toContain("Alex Morgan");
+  expect(profile).toContain("Product Reliability Engineer");
   expect(builderResponse.ok()).toBe(true);
   expect(builder).toContain("Print / Save as PDF");
   expect(builder).toContain("Your details");

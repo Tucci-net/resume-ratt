@@ -12,6 +12,7 @@ import {
   serializeCareerLibraryMarkdown,
 } from "@/lib/career-library/format";
 import { reconcileCareerLibraryItems } from "@/lib/career-library/merge";
+import { proposeCareerLibraryVariant } from "@/lib/resume/lifecycle";
 import { splitResumeItems } from "@/lib/resume/format";
 import {
   parseResumeJson,
@@ -48,16 +49,13 @@ const INPUT_CLASS =
 export function CareerLibraryPanel({
   resume,
   setResume,
+  draftId,
   careerLibrary,
-  onLibraryItemUpdate,
 }: {
   resume: ResumeContent;
   setResume: Dispatch<SetStateAction<ResumeContent>>;
+  draftId: string;
   careerLibrary: ReturnType<typeof useCareerLibrary>;
-  onLibraryItemUpdate: (
-    previous: CareerLibraryItem,
-    updated: CareerLibraryItem,
-  ) => void;
 }) {
   const {
     items,
@@ -75,6 +73,7 @@ export function CareerLibraryPanel({
   const [newSkills, setNewSkills] = useState("");
   const [newMetrics, setNewMetrics] = useState("");
   const [newSource, setNewSource] = useState("");
+  const [newRestricted, setNewRestricted] = useState(false);
   const [notice, setNotice] = useState("");
   const [isResumeImportOpen, setIsResumeImportOpen] = useState(false);
   const [resumeImportText, setResumeImportText] = useState("");
@@ -95,9 +94,11 @@ export function CareerLibraryPanel({
       id: crypto.randomUUID(),
       type: newType,
       canonicalText,
+      canonicalRevisionId: crypto.randomUUID(),
       tags: parseList(newTags),
       skills: parseList(newSkills),
       metrics: parseList(newMetrics),
+      ...(newRestricted ? { restricted: true } : {}),
       ...(newSource.trim() ? { source: newSource.trim() } : {}),
       verificationStatus: "unverified",
       createdAt: now,
@@ -109,6 +110,7 @@ export function CareerLibraryPanel({
     setNewSkills("");
     setNewMetrics("");
     setNewSource("");
+    setNewRestricted(false);
     setError("");
     setNotice("Added to the Career Library.");
   }
@@ -121,8 +123,11 @@ export function CareerLibraryPanel({
         ...patch,
         id: previous.id,
         updatedAt: new Date().toISOString(),
+        canonicalRevisionId:
+          "canonicalText" in patch || "type" in patch
+            ? crypto.randomUUID()
+            : (previous.canonicalRevisionId ?? previous.updatedAt),
       };
-      onLibraryItemUpdate(previous, updated);
       updateItems((current) =>
         current.map((item) => (item.id === id ? updated : item)),
       );
@@ -163,6 +168,9 @@ export function CareerLibraryPanel({
       relationship,
       resumeText: wording,
       libraryItemUpdatedAt: item.updatedAt,
+      canonicalRevisionId: item.canonicalRevisionId ?? item.updatedAt,
+      canonicalTextAtLink: item.canonicalText,
+      evidenceIds: [],
     };
 
     setResume((current) => {
@@ -310,21 +318,7 @@ export function CareerLibraryPanel({
         ? parseCareerLibraryJson(contents)
         : parseCareerLibraryMarkdown(contents);
       const reconciliation = reconcileCareerLibraryItems(items, imported);
-      const changedItems = reconciliation.items.filter((item) => {
-        const previous = items.find((current) => current.id === item.id);
-        return (
-          previous &&
-          (previous.updatedAt !== item.updatedAt ||
-            previous.canonicalText !== item.canonicalText)
-        );
-      });
-      for (const item of changedItems) {
-        const previous = items.find((entry) => entry.id === item.id);
-        if (previous) onLibraryItemUpdate(previous, item);
-      }
-      updateItems((current) =>
-        reconcileCareerLibraryItems(current, imported).items,
-      );
+      updateItems(() => reconciliation.items);
       setError("");
       setNotice(
         `Imported ${reconciliation.added}, updated ${reconciliation.updated}, skipped ${reconciliation.skipped}, and protected ${reconciliation.conflicts} conflicting item${reconciliation.conflicts === 1 ? "" : "s"}.`,
@@ -351,7 +345,11 @@ export function CareerLibraryPanel({
         );
       }
       setResumeImportCandidates(candidates);
-      setSelectedImportIds(candidates.map((candidate) => candidate.id));
+      setSelectedImportIds(
+        candidates
+          .filter((candidate) => !candidate.restricted)
+          .map((candidate) => candidate.id),
+      );
       setResumeImportError("");
     } catch (parseError) {
       setResumeImportCandidates([]);
@@ -397,10 +395,12 @@ export function CareerLibraryPanel({
       tags: [candidate.section],
       skills: [],
       metrics: [],
+      ...(candidate.restricted ? { restricted: true } : {}),
       source: "Résumé import",
       verificationStatus: "unverified",
       createdAt: now,
       updatedAt: now,
+      canonicalRevisionId: crypto.randomUUID(),
     }));
     updateItems((current) => [...current, ...importedItems]);
     setResume((current) => appendImportedItems(current, importedItems));
@@ -440,8 +440,12 @@ export function CareerLibraryPanel({
   return (
     <section className="mt-6 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900 sm:p-6">
       <AccordionSection
-        title={<span className="text-lg font-semibold">Career Library</span>}
-        description="Save canonical career facts and reuse resume-specific wording across drafts."
+        title={
+          <span className="text-lg font-semibold">
+            Career Library · Canonical Career Evidence
+          </span>
+        }
+        description="Canonical factual claims and evidence. Draft wording is kept separate unless you propose a wording variant."
       >
         <div className="space-y-5 pt-5">
           {recoveryRequired ? (
@@ -517,7 +521,13 @@ export function CareerLibraryPanel({
                     <button
                       type="button"
                       aria-label="Close resume import"
-                      onClick={() => setIsResumeImportOpen(false)}
+                      onClick={() => {
+                        setIsResumeImportOpen(false);
+                        setResumeImportText("");
+                        setResumeImportCandidates([]);
+                        setSelectedImportIds([]);
+                        setResumeImportError("");
+                      }}
                       className="rounded p-1 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800"
                     >
                       <X className="h-4 w-4" />
@@ -579,6 +589,11 @@ export function CareerLibraryPanel({
                               }
                             />
                             {candidate.section} · {candidate.type}
+                            {candidate.restricted && (
+                              <span className="text-xs font-normal text-amber-700 dark:text-amber-300">
+                                Restricted evidence · excluded by default
+                              </span>
+                            )}
                           </label>
                           <textarea
                             aria-label={`Edit ${candidate.section} import item`}
@@ -638,6 +653,16 @@ export function CareerLibraryPanel({
                       ))}
                     </select>
                   </Field>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={newRestricted}
+                      onChange={(event) =>
+                        setNewRestricted(event.target.checked)
+                      }
+                    />
+                    Mark as restricted evidence
+                  </label>
                   <Field label="Canonical text">
                     <textarea
                       value={newText}
@@ -710,14 +735,103 @@ export function CareerLibraryPanel({
 
               {resume.careerLibraryReferences.length > 0 && (
                 <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
-                  <h3 className="text-sm font-semibold">Used in this resume</h3>
-                  <ul className="mt-2 space-y-1 text-sm text-neutral-600 dark:text-neutral-300">
-                    {resume.careerLibraryReferences.map((reference, index) => (
-                      <li key={`${reference.libraryItemId}-${index}`}>
-                        {reference.relationship} · {reference.type} ·{" "}
-                        {reference.resumeText}
-                      </li>
-                    ))}
+                  <h3 className="text-sm font-semibold">Canonical Career Evidence in this Working Draft</h3>
+                  <ul className="mt-2 space-y-3 text-sm text-neutral-600 dark:text-neutral-300">
+                    {resume.careerLibraryReferences.map((reference, index) => {
+                      const item = items.find(
+                        (entry) => entry.id === reference.libraryItemId,
+                      );
+                      const differs = Boolean(
+                        item && reference.resumeText.trim() !== item.canonicalText.trim(),
+                      );
+                      return (
+                        <li
+                          key={`${reference.libraryItemId}-${index}`}
+                          className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"
+                        >
+                          <p>
+                            {reference.relationship} · {reference.type} ·{" "}
+                            {reference.resumeText}
+                          </p>
+                          {differs && item && (
+                            <div className="mt-2">
+                              <p className="text-xs">
+                                Draft wording differs from canonical evidence. It remains
+                                draft-only unless you explicitly propose it as a variant.
+                              </p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setResume((current) => ({
+                                      ...current,
+                                      careerLibraryReferences:
+                                        current.careerLibraryReferences.map((entry) =>
+                                          entry.libraryItemId === item.id
+                                            ? {
+                                                ...entry,
+                                                relationship: "copy",
+                                                variantId: undefined,
+                                              }
+                                            : entry,
+                                        ),
+                                    }));
+                                    setNotice("Wording saved to this Working Draft only. Canonical Career Evidence is unchanged.");
+                                  }}
+                                  className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs dark:border-neutral-700"
+                                >
+                                  Save to this draft only
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    try {
+                                      const { item: updated, variant } =
+                                        proposeCareerLibraryVariant(
+                                          item,
+                                          reference.resumeText,
+                                          draftId,
+                                        );
+                                      updateItems((current) =>
+                                        current.map((entry) =>
+                                          entry.id === item.id ? updated : entry,
+                                        ),
+                                      );
+                                      setResume((current) => ({
+                                        ...current,
+                                        careerLibraryReferences:
+                                          current.careerLibraryReferences.map((entry) =>
+                                            entry.libraryItemId === item.id
+                                              ? { ...entry, variantId: variant.id }
+                                              : entry,
+                                          ),
+                                      }));
+                                      setNotice("Proposed wording variant saved; canonical evidence is unchanged.");
+                                      setError("");
+                                    } catch (proposalError) {
+                                      setError(
+                                        proposalError instanceof Error
+                                          ? proposalError.message
+                                          : "The wording variant could not be proposed.",
+                                      );
+                                    }
+                                  }}
+                                  className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs dark:border-neutral-700"
+                                >
+                                  Propose as a new Career Library wording variant
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {item?.variants?.filter((variant) => variant.status === "proposed")
+                            .map((variant) => (
+                              <p key={variant.id} className="mt-2 text-xs">
+                                Proposed variant: {variant.text}
+                              </p>
+                            ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -852,6 +966,9 @@ function appendImportedItems(
       relationship: "reference" as const,
       resumeText: item.canonicalText,
       libraryItemUpdatedAt: item.updatedAt,
+      canonicalRevisionId: item.canonicalRevisionId ?? item.updatedAt,
+      canonicalTextAtLink: item.canonicalText,
+      evidenceIds: [],
     })),
   ];
   return updated;
@@ -962,10 +1079,62 @@ function CareerLibraryItemCard({
             className={INPUT_CLASS}
           />
         </Field>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            aria-label={`Restricted evidence for ${item.id}`}
+            checked={Boolean(item.restricted)}
+            onChange={(event) =>
+              onUpdate({ restricted: event.target.checked || undefined })
+            }
+          />
+          Restricted evidence
+        </label>
       </div>
+      {item.restricted && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          Restricted evidence · excluded by default during résumé import review.
+        </p>
+      )}
       <p className="mt-2 text-xs text-neutral-500">
         Updated {new Date(item.updatedAt).toLocaleString()}
       </p>
+      {item.variants && item.variants.length > 0 && (
+        <div className="mt-3 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+          <h4 className="text-sm font-medium">Wording variants</h4>
+          <ul className="mt-2 space-y-2">
+            {item.variants.map((variant) => (
+              <li
+                key={variant.id}
+                className="rounded-md bg-neutral-50 p-2 text-sm dark:bg-neutral-800"
+              >
+                <p>{variant.text}</p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {variant.status}
+                  {variant.sourceDraftId ? ` · proposed from ${variant.sourceDraftId}` : ""}
+                </p>
+                {variant.status === "proposed" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdate({
+                        variants: item.variants?.map((entry) =>
+                          entry.id === variant.id
+                            ? { ...entry, status: "approved" }
+                            : entry,
+                        ),
+                      })
+                    }
+                    className="mt-2 rounded-md border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
+                  >
+                    Approve variant
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="mt-4 border-t border-neutral-200 pt-3 dark:border-neutral-800">
         <label className="block text-sm font-medium">
           Resume-specific wording

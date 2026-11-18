@@ -31,9 +31,9 @@ import type {
   ResumeSectionConfig,
 } from "@/lib/resume/model";
 import {
-  syncReferencedResume,
-  syncResumeContentToCareerLibrary,
-} from "@/lib/resume/library-sync";
+  getStaleResumeReferences,
+  updateDraftPresentationReferences,
+} from "@/lib/resume/lifecycle";
 import {
   isSupportedTtf,
   MAX_TTF_FILE_SIZE,
@@ -68,7 +68,7 @@ export function ResumeBuilder() {
     saveError,
     status,
     setResume: setDraftResume,
-    updateDrafts,
+    submitActiveDraft,
     setDesign,
     setSections,
     selectDraft,
@@ -84,8 +84,23 @@ export function ResumeBuilder() {
   const uploadedFontsRef = useRef<UploadedFont[]>([]);
   const [fontError, setFontError] = useState("");
   const [isUploadingFont, setIsUploadingFont] = useState(false);
+  const [targetApplicationId, setTargetApplicationId] = useState("");
+  const [snapshotError, setSnapshotError] = useState("");
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
   const googleFontReady = useRef<Promise<void>>(Promise.resolve());
   const resume = activeDraft?.resume ?? INITIAL_RESUME;
+  const staleReferences = getStaleResumeReferences(
+    resume,
+    careerLibrary.items,
+  );
+  const staleDraftIds = new Set(
+    store.drafts
+      .filter(
+        (draft) =>
+          getStaleResumeReferences(draft.resume, careerLibrary.items).length > 0,
+      )
+      .map((draft) => draft.id),
+  );
   const design = activeDraft?.design ?? DEFAULT_RESUME_DESIGN;
   const sections = activeDraft?.sections ?? [];
   const selectedFont =
@@ -96,51 +111,26 @@ export function ResumeBuilder() {
   function setResume(
     action: Parameters<typeof setDraftResume>[0],
   ) {
-    const updated =
-      typeof action === "function" ? action(resume) : action;
-    if (!activeDraft) {
-      setDraftResume(updated);
-      return;
-    }
-    const synchronized = syncResumeContentToCareerLibrary(
-      resume,
-      updated,
-      careerLibrary.items,
-      activeDraft.id,
-    );
-    const changedItems = synchronized.items.filter((item) => {
-      const previous = careerLibrary.items.find(
-        (current) => current.id === item.id,
-      );
-      return (
-        !previous ||
-        previous.updatedAt !== item.updatedAt ||
-        previous.canonicalText !== item.canonicalText
-      );
+    setDraftResume((current) => {
+      const updated =
+        typeof action === "function" ? action(current) : action;
+      return updateDraftPresentationReferences(current, updated);
     });
-    updateDrafts((drafts) =>
-      drafts.map((draft) => {
-        if (draft.id === activeDraft.id) {
-          return {
-            ...draft,
-            resume: synchronized.resume,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        const resume = changedItems.reduce((currentResume, item) => {
-          const previous = careerLibrary.items.find(
-            (current) => current.id === item.id,
-          );
-          return previous
-            ? syncReferencedResume(currentResume, previous, item)
-            : currentResume;
-        }, draft.resume);
-        return resume === draft.resume
-          ? draft
-          : { ...draft, resume, updatedAt: new Date().toISOString() };
-      }),
-    );
-    careerLibrary.updateItems(() => synchronized.items);
+  }
+
+  function submitResume() {
+    try {
+      const snapshot = submitActiveDraft(
+        targetApplicationId,
+        careerLibrary.items,
+      );
+      setSelectedSnapshotId(snapshot.id);
+      setSnapshotError("");
+    } catch (error) {
+      setSnapshotError(
+        error instanceof Error ? error.message : "The resume snapshot could not be saved.",
+      );
+    }
   }
 
   useEffect(() => {
@@ -319,7 +309,7 @@ export function ResumeBuilder() {
       <div className="resume-builder-header mb-6">
         <div>
           <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-            Resume builder
+            Working Draft
           </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">
             Make your next move.
@@ -340,6 +330,7 @@ export function ResumeBuilder() {
               {store.drafts.map((draft) => (
                 <option key={draft.id} value={draft.id}>
                   {draft.name}
+                  {staleDraftIds.has(draft.id) ? " · Career evidence changed" : ""}
                 </option>
               ))}
             </select>
@@ -398,6 +389,43 @@ export function ResumeBuilder() {
             Print / Save as PDF
           </button>
         </div>
+        <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+          <label className="min-w-[14rem] flex-1 text-sm font-medium">
+            Target job / application ID
+            <input
+              aria-label="Target job or application ID"
+              value={targetApplicationId}
+              onChange={(event) => setTargetApplicationId(event.target.value)}
+              className={INPUT_CLASS}
+              placeholder="Application identifier"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={submitResume}
+            className="rounded-md border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Mark as submitted
+          </button>
+          <span className="text-xs text-neutral-500">
+            Saves an immutable submission snapshot; this working draft stays editable.
+          </span>
+          {snapshotError && (
+            <p role="alert" className="w-full text-sm text-red-600">
+              {snapshotError}
+            </p>
+          )}
+        </div>
+        {staleReferences.length > 0 && (
+          <p
+            role="status"
+            className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"
+          >
+            Canonical Career Evidence changed for {staleReferences.length} linked
+            item{staleReferences.length === 1 ? "" : "s"}. This Working Draft
+            has not been rewritten.
+          </p>
+        )}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
           <span role="status" aria-live="polite">
             {status === "loading"
@@ -611,22 +639,9 @@ export function ResumeBuilder() {
           </div>
           <CareerLibraryPanel
             resume={resume}
-            setResume={setDraftResume}
+            setResume={setResume}
+            draftId={activeDraft.id}
             careerLibrary={careerLibrary}
-            onLibraryItemUpdate={(previous, updated) =>
-              updateDrafts((drafts) =>
-                drafts.map((draft) => {
-                  const resume = syncReferencedResume(
-                    draft.resume,
-                    previous,
-                    updated,
-                  );
-                  return resume === draft.resume
-                    ? draft
-                    : { ...draft, resume, updatedAt: new Date().toISOString() };
-                }),
-              )
-            }
           />
         </section>
 
@@ -641,6 +656,134 @@ export function ResumeBuilder() {
             <AtsSafePreview resume={resume} sections={sections} />
           </div>
         </div>
+        {store.snapshots.length > 0 && (
+          <section className="mt-8 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+            <h2 className="text-lg font-semibold">Submitted Snapshots</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Immutable records of submitted content and the canonical evidence revisions used.
+            </p>
+            <label className="mt-4 block max-w-xl text-sm font-medium">
+              Submitted Snapshot
+              <select
+                aria-label="Submitted Snapshot"
+                value={selectedSnapshotId}
+                onChange={(event) => setSelectedSnapshotId(event.target.value)}
+                className={INPUT_CLASS}
+              >
+                <option value="">Choose a submitted snapshot</option>
+                {store.snapshots.map((snapshot) => (
+                  <option key={snapshot.id} value={snapshot.id}>
+                    {snapshot.targetApplicationId} · {snapshot.draftName} ·{" "}
+                    {new Date(snapshot.submittedAt).toLocaleString()}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {store.snapshots
+              .filter((snapshot) => snapshot.id === selectedSnapshotId)
+              .map((snapshot) => (
+                <div key={snapshot.id} className="mt-4 space-y-4">
+                  <div>
+                    <h3 className="mb-2 font-medium">Submitted Snapshot preview</h3>
+                    <ResumeDocument
+                      resume={{
+                        ...snapshot.content,
+                        experience: snapshot.content.experience.map((entry) => ({
+                          ...entry,
+                          accomplishments: [...entry.accomplishments],
+                        })),
+                        education: snapshot.content.education.map((entry) => ({
+                          ...entry,
+                        })),
+                        projects: snapshot.content.projects.map((entry) => ({
+                          ...entry,
+                          accomplishments: [...entry.accomplishments],
+                        })),
+                        certifications: snapshot.content.certifications.map(
+                          (entry) => ({ ...entry }),
+                        ),
+                        careerLibraryReferences:
+                          snapshot.content.careerLibraryReferences.map(
+                            (reference) => ({
+                              ...reference,
+                              evidenceIds: reference.evidenceIds
+                                ? [...reference.evidenceIds]
+                                : undefined,
+                            }),
+                          ),
+                      }}
+                      sections={snapshot.sections.map((section) => ({ ...section }))}
+                      design={{ ...snapshot.design }}
+                      fontFamily={
+                        RESUME_FONTS.find(
+                          (font) => font.id === snapshot.design.fontFamily,
+                        )?.cssFamily ?? RESUME_FONTS[0]!.cssFamily
+                      }
+                    />
+                  </div>
+                  <div className="rounded-md bg-neutral-50 p-3 text-sm dark:bg-neutral-800">
+                    <p>
+                      <strong>Submitted Snapshot:</strong> {snapshot.content.name || snapshot.draftName}
+                    </p>
+                    <p>
+                      <strong>Application:</strong> {snapshot.targetApplicationId}
+                    </p>
+                    <p>
+                      <strong>Submitted:</strong>{" "}
+                      {new Date(snapshot.submittedAt).toLocaleString()}
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap">{snapshot.content.summary}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium">Canonical evidence at submission vs current</h3>
+                    {snapshot.sources.length === 0 ? (
+                      <p className="mt-2 text-sm text-neutral-500">
+                        This snapshot has no linked Career Library evidence.
+                      </p>
+                    ) : (
+                      <ul className="mt-2 space-y-3">
+                        {snapshot.sources.map((source) => {
+                          const current = careerLibrary.items.find(
+                            (item) => item.id === source.libraryItemId,
+                          );
+                          const currentRevision =
+                            current?.canonicalRevisionId ?? current?.updatedAt ?? null;
+                          const changed =
+                            !current ||
+                            currentRevision !== source.canonicalRevisionId;
+                          return (
+                            <li
+                              key={source.libraryItemId}
+                              className="rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-700"
+                            >
+                              <p className="font-medium">
+                                {source.libraryItemId}
+                                {changed && (
+                                  <span className="ml-2 text-amber-700 dark:text-amber-300">
+                                    Canonical evidence changed
+                                  </span>
+                                )}
+                              </p>
+                              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                                <p className="whitespace-pre-wrap">
+                                  <strong>At submission:</strong>
+                                  {"\n"}{source.canonicalTextAtSubmission}
+                                </p>
+                                <p className="whitespace-pre-wrap">
+                                  <strong>Current:</strong>
+                                  {"\n"}{current?.canonicalText ?? "Career Library record no longer exists."}
+                                </p>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </section>
+        )}
       </div>
       <p className="resume-builder-footer mt-6 text-center text-xs text-neutral-500 dark:text-neutral-400">
         Your draft stays in this browser session. Use Print / Save as PDF to

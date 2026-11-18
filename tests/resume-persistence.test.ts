@@ -23,7 +23,7 @@ describe("versioned local resume drafts", () => {
     });
 
     expect(parseResumeDraftStore(serialized).store).toMatchObject({
-      version: 2,
+      version: 3,
       activeDraftId: "second-draft",
       drafts: [{ id: "default-resume" }, { id: "second-draft", name: "Product design" }],
     });
@@ -41,8 +41,28 @@ describe("versioned local resume drafts", () => {
 
     const result = parseResumeDraftStore(legacy);
     expect(result.migrated).toBe(true);
-    expect(result.store.version).toBe(2);
+    expect(result.store.version).toBe(3);
     expect(result.store.drafts[0]?.resume.careerLibraryReferences).toEqual([]);
+    expect(result.store.snapshots).toEqual([]);
+  });
+
+  it("migrates version 2 presentation drafts without losing their content", () => {
+    const store = createInitialResumeDraftStore();
+    const draft = {
+      ...store.drafts[0]!,
+      resume: { ...store.drafts[0]!.resume, name: "Jordan Lee" },
+    };
+    const legacy = JSON.stringify({
+      version: 2,
+      activeDraftId: draft.id,
+      drafts: [draft],
+    });
+
+    const result = parseResumeDraftStore(legacy);
+    expect(result.migrated).toBe(true);
+    expect(result.store.version).toBe(3);
+    expect(result.store.drafts[0]?.resume.name).toBe("Jordan Lee");
+    expect(result.store.snapshots).toEqual([]);
   });
 
   it("falls back to a built-in font when a stored custom font is unavailable", () => {

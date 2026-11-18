@@ -46,6 +46,44 @@ describe("Career Library interchange formats", () => {
     ).toEqual(items);
   });
 
+  it("preserves canonical revisions and proposed variants in JSON and Markdown", () => {
+    const revised = [
+      {
+        ...items[0]!,
+        canonicalRevisionId: "canonical-revision-2",
+        variants: [
+          {
+            id: "variant-1",
+            text: "Improved deployment time by 35%.",
+            status: "proposed" as const,
+            sourceDraftId: "draft-1",
+            createdAt: "2026-02-03T04:05:06.000Z",
+          },
+        ],
+      },
+    ];
+
+    expect(parseCareerLibraryJson(serializeCareerLibraryJson(revised))).toEqual(
+      revised,
+    );
+    expect(
+      parseCareerLibraryMarkdown(serializeCareerLibraryMarkdown(revised)),
+    ).toEqual(revised);
+  });
+
+  it("round-trips restricted evidence metadata in JSON and Markdown", () => {
+    const restrictedItems = [{ ...items[0]!, restricted: true }];
+
+    expect(
+      parseCareerLibraryJson(serializeCareerLibraryJson(restrictedItems)),
+    ).toEqual(restrictedItems);
+    expect(
+      parseCareerLibraryMarkdown(
+        serializeCareerLibraryMarkdown(restrictedItems),
+      ),
+    ).toEqual(restrictedItems);
+  });
+
   it("accepts block-style YAML string arrays", () => {
     const markdown = `---
 id: block-list

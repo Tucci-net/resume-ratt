@@ -68,11 +68,23 @@ export function reconcileCareerLibraryItems(
       ...imported,
       createdAt: current.createdAt,
       updatedAt: now,
+      ...(current.canonicalText !== imported.canonicalText ||
+      current.type !== imported.type
+        ? { canonicalRevisionId: createRevisionId() }
+        : {
+            canonicalRevisionId:
+              current.canonicalRevisionId ?? current.updatedAt,
+          }),
     };
     updated += 1;
   }
 
   return { items, added, updated, skipped, conflicts };
+}
+
+function createRevisionId(): string {
+  return globalThis.crypto?.randomUUID?.() ??
+    `revision-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function sameCareerLibraryContent(
@@ -85,6 +97,8 @@ function sameCareerLibraryContent(
     JSON.stringify(left.tags) === JSON.stringify(right.tags) &&
     JSON.stringify(left.skills) === JSON.stringify(right.skills) &&
     JSON.stringify(left.metrics) === JSON.stringify(right.metrics) &&
+    Boolean(left.restricted) === Boolean(right.restricted) &&
+    JSON.stringify(left.variants ?? []) === JSON.stringify(right.variants ?? []) &&
     left.source === right.source &&
     left.verificationStatus === right.verificationStatus
   );

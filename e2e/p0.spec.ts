@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 test("autosaves resume content across a browser reload", async ({ page }) => {
@@ -64,7 +65,7 @@ test("reuses Career Library wording without changing canonical text", async ({
   );
 });
 
-test("imports library data without overwriting a matching stable ID", async ({
+test("protects current evidence when importing a stale Career Library revision", async ({
   page,
 }) => {
   await page.goto("/resume");
@@ -80,33 +81,40 @@ test("imports library data without overwriting a matching stable ID", async ({
   const stableId = idText.split("ID ")[1]?.toLowerCase();
   expect(stableId).toBeTruthy();
 
+  const staleExport = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export JSON" }).click();
+  const exportedFile = await staleExport;
+  const exportedPath = await exportedFile.path();
+  expect(exportedPath).toBeTruthy();
+  const staleLibraryJson = await readFile(exportedPath!, "utf8");
+
+  await itemCard
+    .getByLabel("Canonical text")
+    .fill("Current canonical revision must be preserved");
+
   await page.getByLabel(/Import JSON \/ Markdown/).setInputFiles({
-    name: "conflicting-library.json",
+    name: "stale-library.json",
     mimeType: "application/json",
-    buffer: Buffer.from(
-      JSON.stringify({
-        version: 1,
-        items: [
-          {
-            id: stableId,
-            type: "accomplishment",
-            canonicalText: "Imported text must not replace the original",
-            tags: [],
-            skills: [],
-            metrics: [],
-            verificationStatus: "verified",
-            createdAt: "2026-01-02T03:04:05.000Z",
-            updatedAt: "2026-01-02T03:04:05.000Z",
-          },
-        ],
-      }),
-    ),
+    buffer: Buffer.from(staleLibraryJson),
   });
 
-  await expect(page.getByRole("status").filter({ hasText: "skipped 1 existing ID" }))
+  await expect(
+    page.getByRole("status").filter({
+      hasText: "protected 1 conflicting item",
+    }),
+  )
     .toBeVisible();
   await expect(itemCard.getByLabel("Canonical text")).toHaveValue(
-    "Original canonical skill",
+    "Current canonical revision must be preserved",
+  );
+  await page.reload();
+  await expect(page.getByText("Saved in this browser")).toBeVisible();
+  await page.getByRole("button", { name: /Career Library/ }).click();
+  const persistedItem = page
+    .locator(".resume-editor-panel article")
+    .filter({ hasText: "accomplishment · unverified" });
+  await expect(persistedItem.getByLabel("Canonical text")).toHaveValue(
+    "Current canonical revision must be preserved",
   );
 });
 

@@ -1,19 +1,26 @@
 import { defineConfig } from "@playwright/test";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdtempSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const careerProfileDirectory = path.join(
-  os.tmpdir(),
-  "resume-ratt-e2e-profile",
+const careerProfileDirectory = mkdtempSync(
+  path.join(os.tmpdir(), "resume-ratt-e2e-"),
 );
-mkdirSync(careerProfileDirectory, { recursive: true });
+const useDevelopmentServer =
+  process.env.RESUME_RATT_E2E_DEVELOPMENT === "true";
 copyFileSync(
-  path.join(process.cwd(), "profiles", "profile-tanner.md"),
-  path.join(careerProfileDirectory, "profile-tanner.md"),
+  path.join(
+    process.cwd(),
+    "e2e",
+    "fixtures",
+    "profile-synthetic-e2e-user.md",
+  ),
+  path.join(careerProfileDirectory, "synthetic-e2e-user.md"),
 );
 process.env.CAREER_PROFILE_DIRECTORY = careerProfileDirectory;
-process.env.CAREER_PROFILE_ID = "profile-tanner";
+process.env.CAREER_PROFILE_ID = "synthetic-e2e-user";
+process.env.RESUME_RATT_E2E_PROFILE_DIRECTORY = careerProfileDirectory;
+process.env.RESUME_RATT_E2E_PRODUCTION = String(!useDevelopmentServer);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -24,13 +31,18 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:3219",
   },
   webServer: {
-    command: "pnpm dev --hostname 127.0.0.1 --port 3219",
+    command: useDevelopmentServer
+      ? "NODE_ENV=development pnpm dev --hostname 127.0.0.1 --port 3219"
+      : "NODE_ENV=production pnpm build && NODE_ENV=production pnpm start --hostname 127.0.0.1 --port 3219",
     url: "http://127.0.0.1:3219",
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 300_000,
     env: {
       CAREER_PROFILE_DIRECTORY: careerProfileDirectory,
-      CAREER_PROFILE_ID: "profile-tanner",
+      CAREER_PROFILE_ID: "synthetic-e2e-user",
+      RESUME_RATT_E2E_PROFILE_DIRECTORY: careerProfileDirectory,
+      RESUME_RATT_E2E_PRODUCTION: String(!useDevelopmentServer),
+      NODE_ENV: useDevelopmentServer ? "development" : "production",
     },
   },
 });

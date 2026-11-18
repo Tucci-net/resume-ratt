@@ -57,13 +57,24 @@ export type CareerLibraryVerificationStatus =
   | "self-verified"
   | "verified";
 
+export type CareerLibraryVariant = {
+  id: string;
+  text: string;
+  status: "proposed" | "approved" | "rejected";
+  sourceDraftId?: string;
+  createdAt: string;
+};
+
 export type CareerLibraryItem = {
   id: string;
   type: CareerLibraryItemType;
   canonicalText: string;
+  canonicalRevisionId?: string;
   tags: string[];
   skills: string[];
   metrics: string[];
+  restricted?: boolean;
+  variants?: CareerLibraryVariant[];
   source?: string;
   verificationStatus: CareerLibraryVerificationStatus;
   createdAt: string;
@@ -82,6 +93,10 @@ export type ResumeLibraryReference = {
   relationship: "copy" | "reference";
   resumeText: string;
   libraryItemUpdatedAt?: string;
+  canonicalRevisionId?: string;
+  canonicalTextAtLink?: string;
+  evidenceIds?: string[];
+  variantId?: string;
 };
 
 export type ResumeContent = {
@@ -120,6 +135,32 @@ export type ResumeDesignSettings = {
   lineHeight: number;
   sectionSpacing: number;
 };
+
+export type ResumeSnapshotSource = {
+  libraryItemId: string;
+  evidenceIds: string[];
+  variantId?: string;
+  canonicalRevisionId: string;
+  canonicalTextAtSubmission: string;
+};
+
+type DeepReadonly<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends object
+    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T;
+
+export type ResumeSnapshot = DeepReadonly<{
+  id: string;
+  draftId: string;
+  draftName: string;
+  targetApplicationId: string;
+  submittedAt: string;
+  content: ResumeContent;
+  design: ResumeDesignSettings;
+  sections: ResumeSectionConfig[];
+  sources: ResumeSnapshotSource[];
+}>;
 
 export type ResumeFontOption = {
   id: string;

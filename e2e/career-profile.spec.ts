@@ -1,17 +1,29 @@
-import { readFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
 
-test("loads, reviews, approves, and reloads a Markdown career profile", async ({
-  page,
-}) => {
+const PROFILE_ID = "synthetic-e2e-user";
+
+test("uses an isolated synthetic non-Tanner profile", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("heading", { name: "Tanner C. Tucci" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alex Morgan" })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("Tanner C. Tucci");
+  const response = await page.request.get(
+    `/api/career-profiles/${PROFILE_ID}`,
+  );
+  expect(response.ok()).toBe(true);
+  expect(await response.text()).toContain("Alex Morgan");
+});
+
+test("reviews, approves, and reloads edits to the synthetic career profile", async ({ page }) => {
+  test.skip(
+    process.env.RESUME_RATT_E2E_PRODUCTION === "true",
+    "Career profile Markdown edits are available only in the development server.",
+  );
+  await page.goto("/dashboard");
+  await expect(page.getByRole("heading", { name: "Alex Morgan" })).toBeVisible();
   await expect(
-    page.getByText("Full-Stack Systems Engineer", { exact: true }).first(),
+    page.getByText("Product Reliability Engineer", { exact: true }).first(),
   ).toBeVisible();
-  await expect(page.getByText("Portland, Oregon 97212")).toBeVisible();
+  await expect(page.getByText("Madison, Wisconsin 53703")).toBeVisible();
   await expect(page.getByText("Compensation rules")).toBeVisible();
   await expect(
     page.getByText("No source providers are configured for this profile."),
@@ -40,7 +52,7 @@ test("loads, reviews, approves, and reloads a Markdown career profile", async ({
   await page.getByRole("button", { name: "Review & approve changes" }).click();
   const saveResponse = page.waitForResponse(
     (response) =>
-      response.url().includes("/api/career-profiles/profile-tanner") &&
+      response.url().includes(`/api/career-profiles/${PROFILE_ID}`) &&
       response.request().method() === "PATCH",
   );
   await page
@@ -53,21 +65,25 @@ test("loads, reviews, approves, and reloads a Markdown career profile", async ({
     page.getByText("Senior Systems Integration Engineer", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("approved · ai")).toBeVisible();
-  const savedMarkdown = await readFile(
-    path.join(os.tmpdir(), "resume-ratt-e2e-profile", "profile-tanner.md"),
-    "utf8",
+  const savedProfileResponse = await page.request.get(
+    `/api/career-profiles/${PROFILE_ID}`,
   );
-  expect(savedMarkdown).toContain(
-    "targetIdentity: Senior Systems Integration Engineer",
+  expect(savedProfileResponse.ok()).toBe(true);
+  const savedProfile = (await savedProfileResponse.json()) as {
+    profile: { targetIdentity: string; searchTerms: Array<{ status: string }> };
+  };
+  expect(savedProfile.profile.targetIdentity).toBe(
+    "Senior Systems Integration Engineer",
   );
-  expect(savedMarkdown).toContain("status: approved");
+  expect(savedProfile.profile.searchTerms.some((term) => term.status === "approved"))
+    .toBe(true);
 
   await page.reload();
   await expect(
     page.getByText("Senior Systems Integration Engineer", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Reliability Platform Engineer", { exact: true }),
+    page.getByText("Reliability Platform Engineer", { exact: true }).last(),
   ).toBeVisible();
   await expect(page.getByText("approved · ai")).toBeVisible();
 });

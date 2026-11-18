@@ -9,6 +9,7 @@ import {
   RESUME_DRAFT_STORAGE_KEY,
   serializeResumeDraftStore,
 } from "@/lib/resume/persistence";
+import { createResumeSnapshot } from "@/lib/resume/lifecycle";
 import type {
   ResumeDraft,
   ResumeDraftStore,
@@ -18,6 +19,7 @@ import type {
   ResumeDesignSettings,
   ResumeSectionConfig,
 } from "@/lib/resume/model";
+import type { CareerLibraryItem } from "@/lib/resume/model";
 
 export type DraftSaveStatus = "loading" | "saved" | "saving" | "error";
 
@@ -116,6 +118,29 @@ export function useResumeDrafts() {
       }));
     },
     [],
+  );
+
+  const submitActiveDraft = useCallback(
+    (targetApplicationId: string, items: CareerLibraryItem[]) => {
+      const active = store.drafts.find(
+        (draft) => draft.id === store.activeDraftId,
+      );
+      if (!active) throw new Error("No working draft is available to submit.");
+      const snapshot = createResumeSnapshot(
+        active,
+        items,
+        targetApplicationId,
+      );
+      if (store.snapshots.some((entry) => entry.id === snapshot.id)) {
+        throw new Error("A submitted snapshot with this ID already exists.");
+      }
+      setStore((current) => ({
+        ...current,
+        snapshots: [...current.snapshots, snapshot],
+      }));
+      return snapshot;
+    },
+    [store],
   );
 
   const setResume = useCallback(
@@ -239,6 +264,7 @@ export function useResumeDrafts() {
     setSections,
     updateActiveDraft,
     updateDrafts,
+    submitActiveDraft,
     selectDraft,
     createDraft,
     duplicateActiveDraft,
