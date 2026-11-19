@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { inflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
 
 test("reviews plain-text résumé import before saving it to Career Library", async ({
@@ -85,13 +86,26 @@ test("round-trips a Markdown résumé through review and Career Library export/i
   await library.getByLabel("Choose Markdown / JSON").setInputFiles({
     name: "synthetic-resume.md",
     mimeType: "text/markdown",
-    buffer: Buffer.from("# Summary\n\nMarkdown round-trip evidence"),
+    buffer: Buffer.from(
+      "# Alex Candidate\nHeadline: Systems Engineer\nEmail: alex@example.test\nWebsite: [Website](https://example.test/profile)\n\n## Summary\n\nMarkdown round-trip evidence",
+    ),
   });
   await expect(library.getByRole("heading", { name: "Review Import" })).toBeVisible();
-  await expect(library.getByRole("article")).toHaveCount(1);
+  const importReview = library.getByRole("region", {
+    name: "Import Resume",
+  });
+  await expect(importReview.getByRole("article")).toHaveCount(2);
+  await expect(
+    importReview.getByLabel("Edit Contact import item"),
+  ).toHaveValue(/Name: Alex Candidate/);
   await library
     .getByRole("button", { name: "Approve and save selected items" })
     .click();
+  await expect(page.getByLabel("Full name")).toHaveValue("Alex Candidate");
+  await expect(page.getByLabel("Email")).toHaveValue("alex@example.test");
+  await expect(page.getByLabel("Website or LinkedIn")).toHaveValue(
+    "https://example.test/profile",
+  );
 
   const itemCard = library
     .locator("article")
@@ -102,41 +116,133 @@ test("round-trips a Markdown résumé through review and Career Library export/i
   expect(stableId).toBeTruthy();
 
   const downloadPromise = page.waitForEvent("download");
-  await library.getByRole("button", { name: "Export Markdown" }).click();
+  await page
+    .getByRole("button", { name: "Markdown", exact: true })
+    .click();
   const download = await downloadPromise;
   const exported = await readFile((await download.path())!, "utf8");
   expect(exported).toContain("Markdown round-trip evidence");
 
-  await itemCard
-    .getByRole("button", { name: "Delete summary library item" })
-    .click();
-  await expect(library.locator("article")).toHaveCount(0);
-  await library.getByLabel("Import JSON / Markdown").setInputFiles({
+  await page.reload();
+  await page.getByRole("button", { name: "New draft" }).click();
+  await page.getByRole("button", { name: /Career Library/ }).click();
+  await library.getByRole("button", { name: "Import Resume" }).click();
+  await library.getByLabel("Choose Markdown / JSON").setInputFiles({
     name: "career-library-round-trip.md",
     mimeType: "text/markdown",
     buffer: Buffer.from(exported),
   });
 
-  await expect(
-    library.getByRole("status").filter({ hasText: "Imported 1" }),
-  ).toBeVisible();
-  const restoredCard = library
-    .locator("article")
-    .filter({ hasText: "summary · unverified" });
-  await expect(restoredCard.locator("p").first()).toContainText(stableId!);
-  await expect(restoredCard.getByLabel("Canonical text")).toHaveValue(
+  const roundTripReview = library.getByRole("region", {
+    name: "Import Resume",
+  });
+  await expect(roundTripReview.getByRole("heading", { name: "Review Import" })).toBeVisible();
+  await expect(roundTripReview.getByLabel("Résumé text to import")).toHaveValue(exported);
+  await expect(roundTripReview.getByRole("article")).toHaveCount(2);
+  await expect(roundTripReview.getByLabel("Edit Summary import item")).toHaveValue(
     "Markdown round-trip evidence",
+  );
+  await library
+    .getByRole("button", { name: "Approve and save selected items" })
+    .click();
+  await expect(page.locator(".resume-paper-page")).toContainText(
+    "Markdown round-trip evidence",
+  );
+  await expect(page.locator(".resume-paper-page")).toContainText(
+    "Alex Candidate",
+  );
+  await expect(page.locator(".resume-paper-page")).toContainText(
+    "https://example.test/profile",
+  );
+  await expect(page.locator(".resume-paper-page")).not.toContainText(stableId!);
+});
+
+test("saves a revisioned draft and exports only visible presentation fields", async ({
+  page,
+}) => {
+  await page.goto("/resume");
+  await expect(page.getByText("Saved in this browser")).toBeVisible();
+  await page.getByLabel("Full name").fill("Export Candidate");
+  await page.getByRole("textbox", { name: "Summary" }).fill(
+    "Visible summary for export.",
+  );
+  await page.getByRole("button", { name: /Page structure/ }).click();
+  await page.getByRole("button", { name: "Hide Skills" }).click();
+
+  await expect(page.getByText(/Working Draft revision/)).toBeVisible();
+  await expect(page.getByText("Saved in this browser")).toBeVisible();
+  const beforeSaveRevision = await page.evaluate(() => {
+    const raw = localStorage.getItem("resume-ratt:drafts");
+    if (!raw) return 0;
+    return JSON.parse(raw).drafts[0]?.revision ?? 0;
+  });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText(/Working Draft revision/)).toBeVisible();
+  await page.waitForFunction(
+    (expectedVersion) => {
+      const raw = localStorage.getItem("resume-ratt:drafts");
+      if (!raw) return false;
+      const store = JSON.parse(raw) as {
+        version: number;
+        drafts: Array<{ revision: number }>;
+      };
+      return store.version === expectedVersion && (store.drafts[0]?.revision ?? 0) > 1;
+    },
+    4,
   );
 
-  await page.reload();
-  await page.getByRole("button", { name: /Career Library/ }).click();
-  const persistedCard = page
-    .getByRole("region", { name: /Career Library/ })
-    .locator("article")
-    .filter({ hasText: "summary · unverified" });
-  await expect(persistedCard.getByLabel("Canonical text")).toHaveValue(
-    "Markdown round-trip evidence",
+  const markdownDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Markdown", exact: true })
+    .click();
+  const markdownFile = await markdownDownload;
+  const markdown = await readFile((await markdownFile.path())!, "utf8");
+  expect(markdown).toContain("# Export Candidate");
+  expect(markdown).toContain("## Summary");
+  expect(markdown).not.toContain("## Skills");
+  expect(markdown).not.toContain("<br");
+  expect(markdown).not.toContain("resume-ratt:career-library");
+
+  const jsonDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "JSON", exact: true }).click();
+  const jsonFile = await jsonDownload;
+  const jsonText = await readFile((await jsonFile.path())!, "utf8");
+  const exportedJson = JSON.parse(jsonText) as {
+    content: { name: string; summary: string; skills: string };
+    draft: { revision: number };
+  };
+  expect(exportedJson.content.name).toBe("Export Candidate");
+  expect(exportedJson.content.summary).toBe("Visible summary for export.");
+  expect(exportedJson.content.skills).toBe("");
+  expect(exportedJson.draft.revision).toBeGreaterThanOrEqual(
+    beforeSaveRevision,
   );
+
+  const textDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Plain Text" }).click();
+  const textFile = await textDownload;
+  const plainText = await readFile((await textFile.path())!, "utf8");
+  expect(plainText).toContain("Export Candidate");
+  expect(plainText).toContain("Visible summary for export.");
+  expect(plainText).not.toContain("Skills");
+
+  const pdfDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "PDF", exact: true }).click();
+  const pdfFile = await pdfDownload;
+  const pdfBuffer = await readFile((await pdfFile.path())!);
+  expect(pdfBuffer.subarray(0, 4).toString()).toBe("%PDF");
+  const pdfSource = pdfBuffer.toString("latin1");
+  const pdfText = extractPdfText(pdfBuffer);
+  expect(pdfSource).toMatch(/\/CreationDate\s+\d+\s+0 R/);
+  expect(pdfSource).toContain("(D:20000101000000Z)");
+  expect(pdfSource).toContain("/MediaBox [0 0 612 792]");
+  expect(pdfSource).toContain("/Encoding /WinAnsiEncoding");
+  expect(pdfText).toContain("Export Candidate TJ");
+  expect(pdfText).toContain("Visible summary for export. TJ");
+  expect(pdfText).toMatch(/\bTj\b|\bTJ\b/);
+  expect(pdfText).not.toContain("Resume Ratt");
+  expect(pdfText).not.toContain("http://127.0.0.1");
+  expect(pdfText).not.toContain("Export Resume");
 });
 
 test("keeps draft edits separate and flags a working draft after canonical changes", async ({
@@ -241,6 +347,22 @@ test("freezes submitted content and compares its evidence with the current Caree
   await expect(submittedSection).toContainText(
     "Evidence text after the submission",
   );
+  const snapshotMarkdownDownload = page.waitForEvent("download");
+  await submittedSection
+    .getByRole("button", { name: "Markdown", exact: true })
+    .click();
+  const snapshotMarkdownFile = await snapshotMarkdownDownload;
+  const snapshotMarkdown = await readFile(
+    (await snapshotMarkdownFile.path())!,
+    "utf8",
+  );
+  expect(snapshotMarkdown).toContain("Evidence text at submission");
+  expect(snapshotMarkdown).not.toContain(
+    "Working draft wording after submission",
+  );
+  expect(snapshotMarkdown).not.toContain(
+    "Evidence text after the submission",
+  );
 
   const snapshotId = await page.waitForFunction(() => {
     const raw = localStorage.getItem("resume-ratt:drafts");
@@ -282,7 +404,7 @@ test("rejects malformed Career Library Markdown and JSON without saving data", a
   page,
 }) => {
   const library = await openCareerLibrary(page);
-  await library.getByLabel("Import JSON / Markdown").setInputFiles({
+  await library.getByLabel("Import Career Data").setInputFiles({
     name: "malformed-library.md",
     mimeType: "text/markdown",
     buffer: Buffer.from("Not a Career Library Markdown document"),
@@ -290,7 +412,7 @@ test("rejects malformed Career Library Markdown and JSON without saving data", a
   await expect(library.locator('p[role="alert"]')).toContainText(
     "missing YAML front matter",
   );
-  await library.getByLabel("Import JSON / Markdown").setInputFiles({
+  await library.getByLabel("Import Career Data").setInputFiles({
     name: "malformed-library.json",
     mimeType: "application/json",
     buffer: Buffer.from('{"version":'),
@@ -455,4 +577,34 @@ async function addLibraryItem(
   await expect(
     library.getByRole("status").filter({ hasText: "Added to the Career Library" }),
   ).toBeVisible();
+}
+
+function extractPdfText(pdfBuffer: Buffer): string {
+  const pdfSource = pdfBuffer.toString("latin1");
+  const textStreams: string[] = [];
+  for (const match of pdfSource.matchAll(/stream\r?\n/g)) {
+    const start = match.index + match[0].length;
+    const end = pdfSource.indexOf("\nendstream", start);
+    if (end < 0) continue;
+    try {
+      textStreams.push(
+        inflateSync(pdfBuffer.subarray(start, end))
+          .toString("latin1")
+          .replace(/\[((?:.|\r?\n)*?)\]\s*TJ/g, (array) => {
+            const encodedText = [...array.matchAll(/<([0-9a-f]+)>/gi)]
+              .flatMap((segment) => {
+                const hex = segment[1];
+                return hex
+                  ? [Buffer.from(hex, "hex").toString("latin1")]
+                  : [];
+              })
+              .join("");
+            return `${encodedText} TJ`;
+          }),
+      );
+    } catch {
+      continue;
+    }
+  }
+  return textStreams.join("\n");
 }

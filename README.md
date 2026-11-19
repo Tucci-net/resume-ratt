@@ -2,10 +2,56 @@
 
 Resume Ratt provides an editable career profile and a resume editor with a
 live preview and browser-based printing.
+## Project status
 
+**Current milestone: 0E Echo'**
+## Roadmap
+
+### Phase 0 — Foundation
+- [x] **0A Alpha** — Resume editor proof of concept
+- [x] **0B Bravo** — Career Library and canonical records
+- [x] **0C Charlie** — Import workflow, reconciliation, architecture cleanup
+- [x] **0D Delta** — Lifecycle hardening, submitted snapshots, E2E validation
+- [x] **0E Echo** — Full Resume Lifecycle implementation, Clean PDF Rendering
+
+### Phase 1 — Evidence & Portability
+- [ ] **1A Alpha** — Evidence records, provenance, verification states
+- [ ] **1B Bravo** — Approved wording variants and artifact references
+- [ ] **1C Charlie** — Resume and career-data exports
+- [ ] **1D Delta** — Round-trip and evidence/export hardening
+
+### Phase 2 — Job Ingestion
+- [ ] **2A Alpha** — Pasted job descriptions
+- [ ] **2B Bravo** — Structured requirement extraction
+- [ ] **2C Charlie** — URL ingestion and source provenance
+- [ ] **2D Delta** — Freshness, normalization, and ingestion hardening
+
+### Phase 3 — Matching
+- [ ] **3A Alpha** — Requirement-to-evidence matching
+- [ ] **3B Bravo** — Direct, transferable, partial, and gap classification
+- [ ] **3C Charlie** — Explainable career/job fit scoring
+- [ ] **3D Delta** — Matching validation and human override
+
+### Phase 4 — Search / Auto-Scrub
+- [ ] **4A Alpha** — Provider adapter interface
+- [ ] **4B Bravo** — Initial approved job sources
+- [ ] **4C Charlie** — Query planner, deduplication, and search orchestration
+- [ ] **4D Delta** — Freshness verification and search hardening
+
+### Phase 5 — Application Workflow
+- [ ] **5A Alpha** — Job-specific resume generation
+- [ ] **5B Bravo** — Application packages and supporting materials
+- [ ] **5C Charlie** — Application tracking and follow-up state
+- [ ] **5D Delta** — Submission history and workflow hardening
+
+### Later
+- Multi-user persistence and authentication
+- Self-hosting / enterprise deployment
+- Analytics based on application outcomes
+- 
 ## Current behavior
 
-- Résumé drafts, Career Library data, and submitted snapshots are stored in
+- Resume drafts, Career Library data, and submitted snapshots are stored in
   browser-local storage. Their authority boundaries are intentional:
   - **Career Library — Canonical Career Evidence:** factual claims and evidence
     IDs, with versioned canonical revisions and proposed wording variants.
@@ -28,6 +74,24 @@ live preview and browser-based printing.
   rejected before approval saves them to the Career Library.
 - Restricted JSON résumé evidence is unchecked by default in that review step
   and is saved only when explicitly selected.
+- Working Drafts save in Resume Ratt's local draft store with a persisted
+  revision number. Save is separate from downloading an export.
+- **Export Resume** downloads only the selected draft presentation in Markdown,
+  plain text, JSON, or PDF. The Markdown is human-readable, preserves visible
+  section ordering and links, and intentionally omits Career Library IDs,
+  evidence references, and revision metadata.
+- Markdown Resume exports can be loaded by **Import Resume**, reviewed, and
+  approved back into the Career Library and Working Draft. Conventional section
+  headings, contact details, and structured entry fields are reconstructed.
+- **Export Career Data** is separate from Resume export and downloads the
+  canonical Career Library as a Markdown vault or JSON. A backup archive is
+  not yet available.
+- PDF files are generated directly from resume presentation data with
+  selectable text, Letter page dimensions, fixed margins, no app chrome, and
+  fixed PDF metadata dates. PDF export does not use browser printing.
+- **Print · Clean Print View** remains separate and uses the print stylesheet
+  to show only resume content. Browser-generated print headers and footers may
+  still depend on the user's print settings.
 - The Career Profile dashboard loads a validated Markdown/YAML profile by its
   stable profile ID. Local development automatically selects the Tanner seed
   profile from `profiles/profile-tanner.md`.
@@ -45,7 +109,6 @@ live preview and browser-based printing.
 - Typography settings include a curated Google Fonts list and browser-local
   TrueType font uploads. Only the selected Google Font is requested; uploaded
   font files are not sent to the server.
-- Use your browser's print dialog to print or save a PDF.
 - The dashboard is open for guest use. GitHub sign-in is available when its
   environment variables are configured.
 
@@ -55,6 +118,7 @@ live preview and browser-based printing.
 - Tailwind CSS
 - Auth.js with Prisma/PostgreSQL scaffolding
 - Zod profile validation and YAML front matter parsing
+- `@react-pdf/renderer` for direct, selectable-text resume PDF exports
 - Vitest
 
 ## Getting started
@@ -95,7 +159,8 @@ the current Markdown update endpoint intentionally refuses production writes.
 
 ## Search Intelligence
 
-The Search Strategy page is linked from the dashboard. Its data pipeline is:
+Resume Ratt separates career identity, search preferences, taxonomy knowledge,
+and operational search state.
 
 ```text
 CareerProfile + SearchPreferences + RoleTaxonomy
@@ -108,7 +173,6 @@ CareerProfile + SearchPreferences + RoleTaxonomy
                     ↓
           future source adapters
 ```
-
 These inputs have distinct responsibilities:
 
 - **Identity:** `profiles/{profileId}.md` stores career background, target
@@ -175,5 +239,5 @@ pnpm build
 ```
 
 The Playwright tests start the development server, use an isolated temporary
-copy of the Tanner profile, and check dashboard save/reload alongside the
+copy of the John Smith profile, and check dashboard save/reload alongside the
 resume editor workflow.

@@ -38,6 +38,28 @@ export function useResumeDrafts() {
     setStore(next);
   }, []);
 
+  const saveNow = useCallback(() => {
+    if (!isLoaded || recoveryRequired) return false;
+    setStatus("saving");
+    try {
+      window.localStorage.setItem(
+        RESUME_DRAFT_STORAGE_KEY,
+        serializeResumeDraftStore(store),
+      );
+      setSaveError("");
+      setStatus("saved");
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Your changes could not be saved in this browser.";
+      setSaveError(message);
+      setStatus("error");
+      return false;
+    }
+  }, [isLoaded, recoveryRequired, store]);
+
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(RESUME_DRAFT_STORAGE_KEY);
@@ -95,14 +117,15 @@ export function useResumeDrafts() {
   const updateActiveDraft = useCallback(
     (update: (draft: ResumeDraft) => ResumeDraft) => {
       setStore((current) => {
-        const nextDrafts = current.drafts.map((draft) =>
-          draft.id === current.activeDraftId
-            ? update({
-                ...draft,
-                updatedAt: new Date().toISOString(),
-              })
-            : draft,
-        );
+        const nextDrafts = current.drafts.map((draft) => {
+          if (draft.id !== current.activeDraftId) return draft;
+          const updatedAt = new Date().toISOString();
+          return {
+            ...update({ ...draft, updatedAt }),
+            updatedAt,
+            revision: draft.revision + 1,
+          };
+        });
         const next = { ...current, drafts: nextDrafts };
         return next;
       });
@@ -203,6 +226,7 @@ export function useResumeDrafts() {
         id: crypto.randomUUID(),
         name: `${original.name} copy`.slice(0, 100),
         updatedAt: new Date().toISOString(),
+        revision: 1,
       };
       const next = {
         ...current,
@@ -259,6 +283,7 @@ export function useResumeDrafts() {
     warnings,
     saveError,
     status,
+    saveNow,
     setResume,
     setDesign,
     setSections,

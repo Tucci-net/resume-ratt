@@ -14,7 +14,7 @@ import type {
 } from "./model";
 
 export const RESUME_DRAFT_STORAGE_KEY = "resume-ratt:drafts";
-export const RESUME_DRAFT_STORE_VERSION = 3;
+export const RESUME_DRAFT_STORE_VERSION = 4;
 
 const sectionIds = [
   "summary",
@@ -136,6 +136,7 @@ const draftSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(100),
   updatedAt: z.string().datetime(),
+  revision: z.number().int().positive().default(1),
   resume: resumeSchema,
   design: designSchema,
   sections: sectionsSchema,
@@ -147,6 +148,12 @@ const draftStoreV2Schema = z.object({
 });
 const draftStoreV3Schema = z.object({
   version: z.literal(3),
+  activeDraftId: z.string().min(1),
+  drafts: z.array(draftSchema).min(1),
+  snapshots: z.array(snapshotSchema),
+});
+const draftStoreV4Schema = z.object({
+  version: z.literal(4),
   activeDraftId: z.string().min(1),
   drafts: z.array(draftSchema).min(1),
   snapshots: z.array(snapshotSchema),
@@ -172,6 +179,7 @@ export type ResumeDraft = {
   id: string;
   name: string;
   updatedAt: string;
+  revision: number;
   resume: ResumeContent;
   design: ResumeDesignSettings;
   sections: ResumeSectionConfig[];
@@ -199,6 +207,7 @@ export function createResumeDraft(
     id,
     name,
     updatedAt: now,
+    revision: 1,
     resume: structuredClone(INITIAL_RESUME),
     design: { ...DEFAULT_RESUME_DESIGN },
     sections: DEFAULT_RESUME_SECTIONS.map((section) => ({ ...section })),
@@ -245,6 +254,7 @@ export function parseResumeDraftStore(raw: string): ParsedResumeDraftStore {
       normalizeDraft(
         {
           ...draft,
+          revision: 1,
           resume: {
             ...draft.resume,
             careerLibraryReferences: [],
@@ -276,13 +286,32 @@ export function parseResumeDraftStore(raw: string): ParsedResumeDraftStore {
     };
   }
 
+  if (version === 3) {
+    const parsed = draftStoreV3Schema.safeParse(value);
+    if (!parsed.success) {
+      throw new Error(
+        `Saved drafts could not be migrated: ${parsed.error.issues[0]?.message ?? "invalid version 3 data"}. Original data was preserved.`,
+      );
+    }
+
+    const warnings: string[] = [];
+    const drafts = parsed.data.drafts.map((draft) =>
+      normalizeDraft(draft, warnings),
+    );
+    return {
+      store: makeStore(parsed.data.activeDraftId, drafts, parsed.data.snapshots),
+      migrated: true,
+      warnings,
+    };
+  }
+
   if (version !== RESUME_DRAFT_STORE_VERSION) {
     throw new Error(
       `Saved drafts use unsupported version "${String(version)}". Original data was preserved.`,
     );
   }
 
-  const parsed = draftStoreV3Schema.safeParse(value);
+  const parsed = draftStoreV4Schema.safeParse(value);
   if (!parsed.success) {
     throw new Error(
       `Saved drafts are malformed: ${parsed.error.issues[0]?.message ?? "invalid data"}. Original data was preserved.`,
@@ -307,7 +336,7 @@ export function serializeResumeDraftStore(store: ResumeDraftStore): string {
     drafts: store.drafts,
     snapshots: [...store.snapshots],
   };
-  const parsed = draftStoreV3Schema.safeParse(normalized);
+  const parsed = draftStoreV4Schema.safeParse(normalized);
   if (!parsed.success) {
     throw new Error(
       `Drafts could not be saved: ${parsed.error.issues[0]?.message ?? "invalid data"}.`,

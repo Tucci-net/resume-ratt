@@ -92,7 +92,7 @@ test("protects current evidence when importing a stale Career Library revision",
     .getByLabel("Canonical text")
     .fill("Current canonical revision must be preserved");
 
-  await page.getByLabel(/Import JSON \/ Markdown/).setInputFiles({
+  await page.getByLabel("Import Career Data").setInputFiles({
     name: "stale-library.json",
     mimeType: "application/json",
     buffer: Buffer.from(staleLibraryJson),

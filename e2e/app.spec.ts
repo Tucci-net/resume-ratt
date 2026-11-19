@@ -18,7 +18,7 @@ test("serves the homepage, career profile, and resume builder", async ({ request
   expect(profile).toContain("Alex Morgan");
   expect(profile).toContain("Product Reliability Engineer");
   expect(builderResponse.ok()).toBe(true);
-  expect(builder).toContain("Print / Save as PDF");
+  expect(builder).toContain("Clean Print View");
   expect(builder).toContain("Your details");
   expect(builder).toContain("Education");
   expect(builder).toContain("Projects");

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseResumeJson, parseResumeText } from "../lib/resume/import";
+import {
+  parseResumeJson,
+  parseResumeMarkdown,
+  parseResumeText,
+} from "../lib/resume/import";
 
 describe("résumé import parsing", () => {
   it("recognizes common section headings and keeps each section's content", () => {
@@ -66,6 +70,45 @@ Accessibility Specialist`);
     expect(candidates.map(({ text, restricted }) => [text, restricted])).toEqual([
       ["title: Engineer\ncompany: Example Co", false],
       ["title: Internal project\ncompany: Example Co", true],
+    ]);
+  });
+
+  it("parses exported Markdown contact details and conventional section headings", () => {
+    const candidates = parseResumeMarkdown(`# Morgan Lee
+Headline: Product Engineer
+Email: morgan@example.test
+Website: [Website](https://example.test/morgan)
+
+## Summary
+
+Builds resilient products.
+
+## Experience
+
+### Engineer — Example Co
+Location: Remote
+Dates: 2020 – Present
+- Improved service uptime.
+
+## Skills
+
+TypeScript, Testing`);
+
+    expect(
+      candidates.map(({ type, section, text }) => [type, section, text]),
+    ).toEqual([
+      [
+        "contact",
+        "Contact",
+        "Name: Morgan Lee\nHeadline: Product Engineer\nEmail: morgan@example.test\nWebsite: [Website](https://example.test/morgan)",
+      ],
+      ["summary", "Summary", "Builds resilient products."],
+      [
+        "experience",
+        "Experience",
+        "### Engineer — Example Co\nLocation: Remote\nDates: 2020 – Present\nImproved service uptime.",
+      ],
+      ["skill", "Skills", "TypeScript, Testing"],
     ]);
   });
 

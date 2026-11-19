@@ -16,6 +16,7 @@ import { proposeCareerLibraryVariant } from "@/lib/resume/lifecycle";
 import { splitResumeItems } from "@/lib/resume/format";
 import {
   parseResumeJson,
+  parseResumeMarkdown,
   parseResumeText,
 } from "@/lib/resume/import";
 import type { ResumeImportCandidate } from "@/lib/resume/import";
@@ -335,9 +336,13 @@ export function CareerLibraryPanel({
   function parseResumeImport(contents = resumeImportText, filename = "") {
     try {
       const lowerName = filename.toLowerCase();
-      const candidates =
-        lowerName.endsWith(".json") || contents.trimStart().startsWith("{")
-          ? parseResumeJson(contents)
+      const candidates = lowerName.endsWith(".json") ||
+        contents.trimStart().startsWith("{")
+        ? parseResumeJson(contents)
+        : lowerName.endsWith(".md") ||
+            lowerName.endsWith(".markdown") ||
+            /^#\s+.+$/m.test(contents)
+          ? parseResumeMarkdown(contents)
           : parseResumeText(contents);
       if (candidates.length === 0) {
         throw new Error(
@@ -388,24 +393,42 @@ export function CareerLibraryPanel({
       return;
     }
     const now = new Date().toISOString();
-    const importedItems: CareerLibraryItem[] = chosen.map((candidate) => ({
-      id: candidate.id,
-      type: candidate.type,
-      canonicalText: candidate.text.trim(),
-      tags: [candidate.section],
-      skills: [],
-      metrics: [],
-      ...(candidate.restricted ? { restricted: true } : {}),
-      source: "Résumé import",
-      verificationStatus: "unverified",
-      createdAt: now,
-      updatedAt: now,
-      canonicalRevisionId: crypto.randomUUID(),
-    }));
-    updateItems((current) => [...current, ...importedItems]);
-    setResume((current) => appendImportedItems(current, importedItems));
+    const importedItems: CareerLibraryItem[] = chosen
+      .filter(
+        (candidate): candidate is ResumeImportCandidate & {
+          type: Exclude<ResumeImportCandidate["type"], "contact">;
+        } => candidate.type !== "contact",
+      )
+      .map((candidate) => ({
+        id: candidate.id,
+        type: candidate.type,
+        canonicalText: candidate.text.trim(),
+        tags: [candidate.section],
+        skills: [],
+        metrics: [],
+        ...(candidate.restricted ? { restricted: true } : {}),
+        source: "Résumé import",
+        verificationStatus: "unverified",
+        createdAt: now,
+        updatedAt: now,
+        canonicalRevisionId: crypto.randomUUID(),
+      }));
+    if (importedItems.length > 0) {
+      updateItems((current) => [...current, ...importedItems]);
+    }
+    const contactCandidate = chosen.find(
+      (candidate) => candidate.type === "contact",
+    );
+    setResume((current) =>
+      appendImportedItems(
+        contactCandidate
+          ? { ...current, ...parseContactImport(contactCandidate.text) }
+          : current,
+        importedItems,
+      ),
+    );
     setNotice(
-      `Added ${importedItems.length} reviewed item${importedItems.length === 1 ? "" : "s"} to the Career Library.`,
+      `Added ${importedItems.length} reviewed item${importedItems.length === 1 ? "" : "s"} to the Career Library and updated the Working Draft.`,
     );
     setResumeImportCandidates([]);
     setSelectedImportIds([]);
@@ -477,25 +500,9 @@ export function CareerLibraryPanel({
                   <FileText className="h-4 w-4" />
                   Import Resume
                 </button>
-                <button
-                  type="button"
-                  onClick={() => exportFile("json")}
-                  className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
-                >
-                  <Download className="h-4 w-4" />
-                  Export JSON
-                </button>
-                <button
-                  type="button"
-                  onClick={() => exportFile("md")}
-                  className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
-                >
-                  <Download className="h-4 w-4" />
-                  Export Markdown
-                </button>
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
                   <Upload className="h-4 w-4" />
-                  Import JSON / Markdown
+                  Import Career Data
                   <input
                     type="file"
                     accept=".json,.md,.markdown,application/json,text/markdown"
@@ -504,6 +511,35 @@ export function CareerLibraryPanel({
                   />
                 </label>
               </div>
+
+              <section
+                aria-label="Export Career Data"
+                className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800"
+              >
+                <h3 className="font-medium">Export Career Data</h3>
+                <p className="mt-1 text-sm text-neutral-500">
+                  Export canonical Career Library evidence, separately from
+                  any résumé draft.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => exportFile("json")}
+                    className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportFile("md")}
+                    className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Markdown Vault
+                  </button>
+                </div>
+              </section>
 
               {isResumeImportOpen && (
                 <section
@@ -859,8 +895,8 @@ function appendImportedItems(
 ): ResumeContent {
   const updated: ResumeContent = { ...resume };
   for (const item of items) {
-    const lines = item.canonicalText.split("\n").map((line) => line.trim());
-    const firstLine = lines[0] ?? item.canonicalText;
+    const parsed = parseImportedEntry(item.canonicalText);
+    const firstLine = parsed.heading || item.canonicalText;
     switch (item.type) {
       case "summary":
         updated.summary = [updated.summary.trim(), item.canonicalText]
@@ -869,17 +905,20 @@ function appendImportedItems(
         break;
       case "experience": {
         const [jobTitle, employer] = firstLine.split(/\s+[—–-]\s+/, 2);
+        const [startDate = "", rawEndDate = ""] = splitDateRange(
+          parsed.fields.get("Dates") ?? "",
+        );
         updated.experience = [
           ...updated.experience,
           {
             id: item.id,
             jobTitle: jobTitle ?? firstLine,
             employer: employer ?? "",
-            location: "",
-            startDate: "",
-            endDate: "",
-            currentRole: false,
-            accomplishments: lines.slice(1).filter(Boolean),
+            location: parsed.fields.get("Location") ?? "",
+            startDate,
+            endDate: rawEndDate === "Present" ? "" : rawEndDate,
+            currentRole: rawEndDate === "Present",
+            accomplishments: parsed.bodyLines,
           },
         ];
         break;
@@ -900,36 +939,56 @@ function appendImportedItems(
         ];
         break;
       case "project":
-        updated.projects = [
-          ...updated.projects,
-          {
-            id: item.id,
-            name: firstLine,
-            subtitle: "",
-            startDate: "",
-            endDate: "",
-            url: "",
-            description: lines.slice(1).filter(Boolean).join("\n"),
-            accomplishments: [],
-          },
-        ];
+        {
+          const [name, subtitle] = firstLine.split(/\s+[—–-]\s+/, 2);
+          const [startDate = "", endDate = ""] = splitDateRange(
+            parsed.fields.get("Dates") ?? "",
+          );
+          updated.projects = [
+            ...updated.projects,
+            {
+              id: item.id,
+              name: name ?? firstLine,
+              subtitle: subtitle ?? "",
+              startDate,
+              endDate,
+              url: markdownLinkTarget(parsed.fields.get("URL") ?? ""),
+              description:
+                parsed.fields.get("Description") ??
+                parsed.bodyLines.join("\n"),
+              accomplishments: [],
+            },
+          ];
+        }
         break;
       case "education":
+        {
+          const [startDate = "", rawEndDate = ""] = splitDateRange(
+            parsed.fields.get("Dates") ?? "",
+          );
+          const expectedDate = rawEndDate.startsWith("Expected ")
+            ? rawEndDate.slice("Expected ".length)
+            : rawEndDate;
         updated.education = [
           ...updated.education,
           {
             id: item.id,
             institution: firstLine,
-            degree: "",
-            fieldOfStudy: "",
-            location: "",
-            startDate: "",
-            endDate: "",
-            currentlyEnrolled: false,
-            gpa: "",
-            honors: lines.slice(1).filter(Boolean).join("\n"),
+            degree: parsed.fields.get("Degree") ?? "",
+            fieldOfStudy: parsed.fields.get("Field") ?? "",
+            location: parsed.fields.get("Location") ?? "",
+            startDate,
+            endDate: expectedDate,
+            currentlyEnrolled:
+              rawEndDate === "Currently enrolled" ||
+              rawEndDate.startsWith("Expected "),
+            gpa: parsed.fields.get("GPA") ?? "",
+            honors:
+              parsed.fields.get("Honors") ??
+              parsed.bodyLines.join("\n"),
           },
         ];
+        }
         break;
       case "skill": {
         const skills = splitResumeItems(updated.skills);
@@ -942,18 +1001,21 @@ function appendImportedItems(
         break;
       }
       case "certification":
+        {
+          const expiration = parsed.fields.get("Expires") ?? "";
         updated.certifications = [
           ...updated.certifications,
           {
             id: item.id,
             name: firstLine,
-            issuer: "",
-            issueDate: "",
-            expirationDate: "",
-            credentialId: "",
-            credentialUrl: "",
+            issuer: parsed.fields.get("Issuer") ?? "",
+            issueDate: parsed.fields.get("Issued") ?? "",
+            expirationDate: expiration,
+            credentialId: parsed.fields.get("Credential ID") ?? "",
+            credentialUrl: markdownLinkTarget(parsed.fields.get("URL") ?? ""),
           },
         ];
+        }
         break;
     }
   }
@@ -972,6 +1034,70 @@ function appendImportedItems(
     })),
   ];
   return updated;
+}
+
+function parseContactImport(
+  text: string,
+): Partial<Pick<ResumeContent, "name" | "headline" | "email" | "phone" | "location" | "website">> {
+  const values: Partial<
+    Pick<
+      ResumeContent,
+      "name" | "headline" | "email" | "phone" | "location" | "website"
+    >
+  > = {};
+  for (const line of text.split("\n")) {
+    const separator = line.indexOf(":");
+    if (separator < 0) continue;
+    const key = line.slice(0, separator).trim().toLowerCase();
+    const rawValue = line.slice(separator + 1).trim();
+    const value = key === "website" ? markdownLinkTarget(rawValue) : rawValue;
+    switch (key) {
+      case "name":
+      case "headline":
+      case "email":
+      case "phone":
+      case "location":
+        values[key] = value;
+        break;
+      case "website":
+        values.website = value;
+        break;
+    }
+  }
+  return values;
+}
+
+function parseImportedEntry(text: string): {
+  heading: string;
+  fields: Map<string, string>;
+  bodyLines: string[];
+} {
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const heading = (lines[0] ?? "")
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/^\*\*(.*)\*\*$/, "$1");
+  const fields = new Map<string, string>();
+  const bodyLines: string[] = [];
+  for (const line of lines.slice(1)) {
+    const field = /^([A-Za-z][A-Za-z ]*):\s*(.*)$/.exec(line);
+    if (field) {
+      fields.set(field[1]!.trim(), field[2]!.trim());
+    } else {
+      bodyLines.push(line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, ""));
+    }
+  }
+  return { heading, fields, bodyLines };
+}
+
+function splitDateRange(value: string): string[] {
+  return value
+    ? value.split(/\s+[–—-]\s+/, 2).map((part) => part.trim())
+    : [];
+}
+
+function markdownLinkTarget(value: string): string {
+  const link = /^\[[^\]]+\]\((https?:\/\/[^)]+)\)$/.exec(value.trim());
+  return link?.[1] ?? value.trim();
 }
 
 function CareerLibraryItemCard({

@@ -2,7 +2,7 @@ import type { CareerLibraryItemType } from "@/lib/resume/model";
 
 export type ResumeImportCandidate = {
   id: string;
-  type: CareerLibraryItemType;
+  type: CareerLibraryItemType | "contact";
   section: string;
   text: string;
   restricted: boolean;
@@ -65,6 +65,16 @@ export function parseResumeText(input: string): ResumeImportCandidate[] {
   });
 }
 
+export function parseResumeMarkdown(input: string): ResumeImportCandidate[] {
+  const lines = input.replace(/\r\n/g, "\n").split("\n");
+  const sectionIndex = lines.findIndex((line) => sectionTypeFor(line) !== null);
+  const headerLines = sectionIndex < 0 ? lines : lines.slice(0, sectionIndex);
+  const bodyLines = sectionIndex < 0 ? [] : lines.slice(sectionIndex);
+  const candidates = parseResumeText(bodyLines.join("\n"));
+  const contact = parseMarkdownContact(headerLines);
+  return contact ? [contact, ...candidates] : candidates;
+}
+
 export function parseResumeJson(input: string): ResumeImportCandidate[] {
   let value: unknown;
   try {
@@ -125,6 +135,36 @@ function normalizeHeading(line: string): string {
     .replace(/^#{1,6}\s*/, "")
     .replace(/:$/, "")
     .trim();
+}
+
+function sectionTypeFor(line: string): CareerLibraryItemType | null {
+  const heading = normalizeHeading(line).toLowerCase().replace(/:$/, "");
+  return SECTION_TYPES[heading] ?? null;
+}
+
+function parseMarkdownContact(
+  lines: string[],
+): ResumeImportCandidate | undefined {
+  const values: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const nameHeading = /^#\s+(.+)$/.exec(trimmed);
+    if (nameHeading) {
+      values.push(`Name: ${nameHeading[1]!.trim()}`);
+      continue;
+    }
+    if (/^(?:Headline|Email|Phone|Location|Website):\s*/i.test(trimmed)) {
+      values.push(trimmed);
+    }
+  }
+  if (values.length === 0) return undefined;
+  return {
+    id: createId(),
+    type: "contact",
+    section: "Contact",
+    text: values.join("\n"),
+    restricted: false,
+  };
 }
 
 function groupLines(lines: string[]): string[] {

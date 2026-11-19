@@ -23,7 +23,7 @@ describe("versioned local resume drafts", () => {
     });
 
     expect(parseResumeDraftStore(serialized).store).toMatchObject({
-      version: 3,
+      version: 4,
       activeDraftId: "second-draft",
       drafts: [{ id: "default-resume" }, { id: "second-draft", name: "Product design" }],
     });
@@ -41,7 +41,7 @@ describe("versioned local resume drafts", () => {
 
     const result = parseResumeDraftStore(legacy);
     expect(result.migrated).toBe(true);
-    expect(result.store.version).toBe(3);
+    expect(result.store.version).toBe(4);
     expect(result.store.drafts[0]?.resume.careerLibraryReferences).toEqual([]);
     expect(result.store.snapshots).toEqual([]);
   });
@@ -60,8 +60,26 @@ describe("versioned local resume drafts", () => {
 
     const result = parseResumeDraftStore(legacy);
     expect(result.migrated).toBe(true);
-    expect(result.store.version).toBe(3);
+    expect(result.store.version).toBe(4);
     expect(result.store.drafts[0]?.resume.name).toBe("Jordan Lee");
+    expect(result.store.snapshots).toEqual([]);
+  });
+
+  it("migrates version 3 drafts and assigns the first explicit revision", () => {
+    const store = createInitialResumeDraftStore();
+    const { revision: _revision, ...legacyDraft } = store.drafts[0]!;
+    void _revision;
+    const legacy = JSON.stringify({
+      version: 3,
+      activeDraftId: legacyDraft.id,
+      drafts: [legacyDraft],
+      snapshots: [],
+    });
+
+    const result = parseResumeDraftStore(legacy);
+    expect(result.migrated).toBe(true);
+    expect(result.store.version).toBe(4);
+    expect(result.store.drafts[0]?.revision).toBe(1);
     expect(result.store.snapshots).toEqual([]);
   });
 

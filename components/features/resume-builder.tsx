@@ -5,6 +5,7 @@ import type { ChangeEvent } from "react";
 import {
   AlertCircle,
   Check,
+  Download,
   Eye,
   EyeOff,
   Printer,
@@ -12,11 +13,13 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
 import { AccordionSection } from "@/components/features/accordion-section";
 import { AtsSafePreview } from "@/components/features/ats-safe-preview";
 import { CareerLibraryPanel } from "@/components/features/career-library-panel";
 import { ResumeContentEditor } from "@/components/features/resume-content-editor";
 import { ResumeDocument } from "@/components/features/resume-document";
+import { ResumePdfDocument } from "@/components/features/resume-pdf-document";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useResumeDrafts } from "@/hooks/use-resume-drafts";
 import { useCareerLibrary } from "@/hooks/use-career-library";
@@ -28,6 +31,7 @@ import {
 import type {
   ResumeContent,
   ResumeFontOption,
+  ResumeSnapshot,
   ResumeSectionConfig,
 } from "@/lib/resume/model";
 import {
@@ -45,6 +49,12 @@ import {
   RESUME_SECTION_LABELS,
   setResumeSectionVisibility,
 } from "@/lib/resume/sections";
+import {
+  createResumeExportFilename,
+  serializeResumeJson,
+  serializeResumeMarkdown,
+  serializeResumePlainText,
+} from "@/lib/resume/export";
 
 type UploadedFont = ResumeFontOption & {
   fontFace: FontFace;
@@ -67,6 +77,7 @@ export function ResumeBuilder() {
     warnings,
     saveError,
     status,
+    saveNow,
     setResume: setDraftResume,
     submitActiveDraft,
     setDesign,
@@ -86,6 +97,7 @@ export function ResumeBuilder() {
   const [isUploadingFont, setIsUploadingFont] = useState(false);
   const [targetApplicationId, setTargetApplicationId] = useState("");
   const [snapshotError, setSnapshotError] = useState("");
+  const [exportError, setExportError] = useState("");
   const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
   const googleFontReady = useRef<Promise<void>>(Promise.resolve());
   const resume = activeDraft?.resume ?? INITIAL_RESUME;
@@ -267,6 +279,81 @@ export function ResumeBuilder() {
     window.print();
   }
 
+  function saveResume() {
+    saveNow();
+  }
+
+  async function exportResume(
+    source: {
+      name: string;
+      revision?: number;
+      updatedAt?: string;
+      content: ResumeContent;
+      design: typeof design;
+      sections: ResumeSectionConfig[];
+    },
+    format: "pdf" | "markdown" | "text" | "json",
+  ) {
+    try {
+      const baseName = source.name || "resume";
+      if (format === "pdf") {
+        const blob = await pdf(
+          <ResumePdfDocument
+            resume={source.content}
+            sections={source.sections}
+            design={source.design}
+          />,
+        ).toBlob();
+        downloadFile(
+          blob,
+          createResumeExportFilename(baseName, "pdf"),
+        );
+      } else {
+        const serialized =
+          format === "markdown"
+            ? serializeResumeMarkdown(source)
+            : format === "text"
+              ? serializeResumePlainText(source)
+              : serializeResumeJson(source);
+        const extension =
+          format === "markdown" ? "md" : format === "text" ? "txt" : "json";
+        const mimeType =
+          format === "markdown"
+            ? "text/markdown"
+            : format === "text"
+              ? "text/plain"
+              : "application/json";
+        downloadFile(
+          new Blob([serialized], { type: `${mimeType};charset=utf-8` }),
+          createResumeExportFilename(baseName, extension),
+        );
+      }
+      setExportError("");
+    } catch (error) {
+      setExportError(
+        error instanceof Error
+          ? error.message
+          : "The résumé export could not be created.",
+      );
+    }
+  }
+
+  function exportSnapshot(
+    snapshot: ResumeSnapshot,
+    format: "pdf" | "markdown" | "text" | "json",
+  ) {
+    void exportResume(
+      {
+        name: snapshot.draftName,
+        updatedAt: snapshot.submittedAt,
+        content: cloneSnapshotContent(snapshot.content),
+        design: structuredClone(snapshot.design),
+        sections: snapshot.sections.map((section) => ({ ...section })),
+      },
+      format,
+    );
+  }
+
   if (recoveryRequired) {
     return (
       <main className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
@@ -382,13 +469,126 @@ export function ResumeBuilder() {
           </button>
           <button
             type="button"
-            onClick={printResume}
-            className="inline-flex items-center gap-2 rounded-md bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+            onClick={saveResume}
+            disabled={!isLoaded || status === "saving"}
+            className="rounded-md bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
           >
-            <Printer className="h-4 w-4" />
-            Print / Save as PDF
+            Save
           </button>
         </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <section
+            aria-label="Export Resume"
+            className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800"
+          >
+            <h2 className="font-semibold">Export Resume</h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              Downloads the selected Working Draft presentation only.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  void exportResume(
+                    {
+                      name: activeDraft.name,
+                      revision: activeDraft.revision,
+                      updatedAt: activeDraft.updatedAt,
+                      content: resume,
+                      design,
+                      sections,
+                    },
+                    "pdf",
+                  )
+                }
+                className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+              >
+                <Download className="h-4 w-4" />
+                PDF
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void exportResume(
+                    {
+                      name: activeDraft.name,
+                      revision: activeDraft.revision,
+                      updatedAt: activeDraft.updatedAt,
+                      content: resume,
+                      design,
+                      sections,
+                    },
+                    "markdown",
+                  )
+                }
+                className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+              >
+                Markdown
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void exportResume(
+                    {
+                      name: activeDraft.name,
+                      revision: activeDraft.revision,
+                      updatedAt: activeDraft.updatedAt,
+                      content: resume,
+                      design,
+                      sections,
+                    },
+                    "text",
+                  )
+                }
+                className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+              >
+                Plain Text
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void exportResume(
+                    {
+                      name: activeDraft.name,
+                      revision: activeDraft.revision,
+                      updatedAt: activeDraft.updatedAt,
+                      content: resume,
+                      design,
+                      sections,
+                    },
+                    "json",
+                  )
+                }
+                className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+              >
+                JSON
+              </button>
+            </div>
+          </section>
+          <section
+            aria-label="Print"
+            className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800"
+          >
+            <h2 className="font-semibold">Print</h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              Opens a clean print view containing only the résumé. Browser
+              headers and footers may depend on print settings.
+            </p>
+            <button
+              type="button"
+              onClick={printResume}
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+            >
+              <Printer className="h-4 w-4" />
+              Clean Print View
+            </button>
+          </section>
+        </div>
+        {exportError && (
+          <p role="alert" className="mt-2 text-sm text-red-600">
+            {exportError}
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
           <label className="min-w-[14rem] flex-1 text-sm font-medium">
             Target job / application ID
@@ -436,6 +636,9 @@ export function ResumeBuilder() {
                   ? "Not saved"
                   : "Saved in this browser"}
           </span>
+          {isLoaded && activeDraft?.revision !== undefined && (
+            <span>Working Draft revision {activeDraft.revision}</span>
+          )}
           {isLoaded && activeDraft?.updatedAt && (
             <span>
               Last edited {new Date(activeDraft.updatedAt).toLocaleString()}
@@ -683,6 +886,32 @@ export function ResumeBuilder() {
               .filter((snapshot) => snapshot.id === selectedSnapshotId)
               .map((snapshot) => (
                 <div key={snapshot.id} className="mt-4 space-y-4">
+                  <div
+                    aria-label="Export Submitted Snapshot"
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <span className="text-sm font-medium">
+                      Export Submitted Snapshot:
+                    </span>
+                    {(["pdf", "markdown", "text", "json"] as const).map(
+                      (format) => (
+                        <button
+                          key={format}
+                          type="button"
+                          onClick={() => exportSnapshot(snapshot, format)}
+                          className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
+                        >
+                          {format === "pdf"
+                            ? "PDF"
+                            : format === "markdown"
+                              ? "Markdown"
+                              : format === "text"
+                                ? "Plain Text"
+                                : "JSON"}
+                        </button>
+                      ),
+                    )}
+                  </div>
                   <div>
                     <h3 className="mb-2 font-medium">Submitted Snapshot preview</h3>
                     <ResumeDocument
@@ -786,8 +1015,8 @@ export function ResumeBuilder() {
         )}
       </div>
       <p className="resume-builder-footer mt-6 text-center text-xs text-neutral-500 dark:text-neutral-400">
-        Your draft stays in this browser session. Use Print / Save as PDF to
-        keep a copy.
+        Working Drafts save in this browser. Export creates a separate file;
+        Print opens the browser print dialog.
       </p>
       <ConfirmDialog
         open={isDeleteDialogOpen}
@@ -801,6 +1030,48 @@ export function ResumeBuilder() {
       />
     </main>
   );
+}
+
+function downloadFile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function cloneSnapshotContent(
+  content: ResumeSnapshot["content"],
+): ResumeContent {
+  return {
+    name: content.name,
+    headline: content.headline,
+    email: content.email,
+    phone: content.phone,
+    location: content.location,
+    website: content.website,
+    summary: content.summary,
+    experience: content.experience.map((entry) => ({
+      ...entry,
+      accomplishments: [...entry.accomplishments],
+    })),
+    education: content.education.map((entry) => ({ ...entry })),
+    projects: content.projects.map((entry) => ({
+      ...entry,
+      accomplishments: [...entry.accomplishments],
+    })),
+    skills: content.skills,
+    certifications: content.certifications.map((entry) => ({ ...entry })),
+    careerLibraryReferences: content.careerLibraryReferences.map(
+      (reference) => ({
+        ...reference,
+        evidenceIds: reference.evidenceIds
+          ? [...reference.evidenceIds]
+          : undefined,
+      }),
+    ),
+  };
 }
 
 function SectionControls({
